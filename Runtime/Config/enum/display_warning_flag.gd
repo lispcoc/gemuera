@@ -1,5 +1,10 @@
 class_name DisplayWarningFlag
 
+var IGNORE = new(InternalEnum.IGNORE)
+var LATER = new(InternalEnum.LATER)
+var ONCE = new(InternalEnum.ONCE)
+var DISPLAY = new(InternalEnum.DISPLAY)
+
 enum InternalEnum
 {
     IGNORE = 0,

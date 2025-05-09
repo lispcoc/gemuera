@@ -6,7 +6,7 @@ static func get_string(code : int):
             return key
     return "IgnoreCase"
 
-enum ConfigCode
+enum
 {
 	IgnoreCase = 0,
 	UseRenameFile = 1,

@@ -1,16 +1,16 @@
-class_name TextDrawingMode
+class_name ReduceArgumentOnLoadFlag
 
 var value : InternalEnum
 
-var GRAPHICS : TextDrawingMode = new(InternalEnum.GRAPHICS)
-var TEXTRENDERER : TextDrawingMode = new(InternalEnum.TEXTRENDERER)
-var WINAPI : TextDrawingMode = new(InternalEnum.WINAPI)
+var YES : ReduceArgumentOnLoadFlag = new(InternalEnum.YES)
+var ONCE : ReduceArgumentOnLoadFlag = new(InternalEnum.ONCE)
+var NO : ReduceArgumentOnLoadFlag = new(InternalEnum.NO)
 
 enum InternalEnum
 {
-    GRAPHICS = 0,
-    TEXTRENDERER = 1,
-    WINAPI = 2,
+    YES = 0,
+    ONCE = 1,
+    NO = 2,
 }
 
 func _init(_value) -> void:

@@ -1,8 +1,5 @@
 class_name Config
 
-#enum
-
-
 var Encode : Encoding = EncodingHandler.UTF8BOMEncoding
 var SaveEncode : Encoding = EncodingHandler.UTF8BOMEncoding
 var nameDic : Dictionary[ConfigCode, String]

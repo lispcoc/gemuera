@@ -60,11 +60,13 @@ func TryParse (param : String) -> bool:
         Value = UseLanguage.from_string(param)
     if Value is TextEditorType:
         Value = TextEditorType.from_string(param)
+    if Value is ReduceArgumentOnLoadFlag:
+        Value = ReduceArgumentOnLoadFlag.from_string(param)
     return true
 
 func tryStringToStringList(arg : String):
     var ret : PackedStringArray
-    for s in ",".(arg):
+    for s in ",".split(arg):
         ret.append(s)
     return ret
 
@@ -81,7 +83,7 @@ func tryStringToBool(arg : String):
     return false;
 
 func tryStringsToColor(arg : String):
-    tokens := ",".split(arg)
+    var tokens := ",".split(arg)
     if (tokens.size() < 3):
         return false
     var r := tokens[0].to_int()
