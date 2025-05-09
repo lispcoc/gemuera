@@ -1,5 +1,25 @@
 class_name Program
 
+static var ExeDir : String
+static var WorkingDir : String
+
+var CsvDir : String
+var ErbDir : String
+static var DebugDir : String
+var DatDir : String
+var ContentDir : String
+var ExeName : String
+
+var FontDir : String
+
+var rebootFlag : bool
+
+#var RebootWinState : FormWindowState =  FormWindowState.Normal
+var AnalysisMode : bool
+var AnalysisFiles : PackedStringArray
+
+var DebugMode : bool
+
 func Main(args : PackedStringArray):
     # memo: Shift-JISを扱うためのおまじない
     #System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
@@ -7,7 +27,7 @@ func Main(args : PackedStringArray):
     CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
     CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
 
-    var rootCommand := RootCommand.new("Emuera");
+    var rootCommand := RootCommand.new("Emuera")
 
     WorkingDir = AssemblyData.WorkingDir
 
@@ -139,26 +159,6 @@ func SetDirPaths(exeDir : String) -> void:
     #region EE_フォントファイル対応
     FontDir = Path.Combine(ExeDir, "font") + Path.DirectorySeparatorChar;
     #endregion
-
-var ExeDir : String
-var WorkingDir : String
-
-var CsvDir : String
-var ErbDir : String
-var DebugDir : String
-var DatDir : String
-var ContentDir : String
-var ExeName : String
-
-var FontDir : String
-
-var rebootFlag : bool
-
-var RebootWinState : FormWindowState =  FormWindowState.Normal
-var AnalysisMode : bool
-var AnalysisFiles : PackedStringArray
-
-var DebugMode : bool
 
 func _init() -> void:
     var baseDirectory := AppContext.BaseDirectory;

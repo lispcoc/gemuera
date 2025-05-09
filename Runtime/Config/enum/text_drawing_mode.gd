@@ -2,9 +2,9 @@ class_name TextDrawingMode
 
 var value : InternalEnum
 
-var GRAPHICS : TextDrawingMode = new(InternalEnum.GRAPHICS)
-var TEXTRENDERER : TextDrawingMode = new(InternalEnum.TEXTRENDERER)
-var WINAPI : TextDrawingMode = new(InternalEnum.WINAPI)
+static var GRAPHICS : TextDrawingMode = new(InternalEnum.GRAPHICS)
+static var TEXTRENDERER : TextDrawingMode = new(InternalEnum.TEXTRENDERER)
+static var WINAPI : TextDrawingMode = new(InternalEnum.WINAPI)
 
 enum InternalEnum
 {

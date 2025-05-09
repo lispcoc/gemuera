@@ -1,7 +1,7 @@
 class_name ConfigData
 
 var configPath : String = Program.ExeDir + "emuera.config"
-const configdebugPath : String = Program.DebugDir + "debug.config";
+var configdebugPath : String = Program.DebugDir + "debug.config"
 
 func _init() -> void:
     setDefault()
@@ -10,9 +10,9 @@ static var instance : ConfigData  = new()
 var Instance:
     get: return instance
 
-var configArray : Array[AConfigItem] = [];
-var replaceArray : Array[AConfigItem] = [];
-var debugArray : Array[AConfigItem] = [];
+var configArray : Array[ConfigItem] = [];
+var replaceArray : Array[ConfigItem] = [];
+var debugArray : Array[ConfigItem] = [];
 
 func setDefault() -> void:
     configArray.append(ConfigItem.new(ConfigCode.IgnoreCase, "大文字小文字の違いを無視する", "Ignore case", true));
@@ -39,10 +39,10 @@ func setDefault() -> void:
     configArray.append(ConfigItem.new(ConfigCode.FontName, "フォント名", "Font name", "ＭＳ ゴシック"));
     configArray.append(ConfigItem.new(ConfigCode.FontSize, "フォントサイズ", "Font size", 18));
     configArray.append(ConfigItem.new(ConfigCode.LineHeight, "一行の高さ", "Line height", 19));
-    configArray.append(ConfigItem.new(ConfigCode.ForeColor, "文字色", "Text color", Color.new(192, 192, 192)))
-    configArray.append(ConfigItem.new(ConfigCode.BackColor, "背景色", "Background color", Color.new(0, 0, 0)))
-    configArray.append(ConfigItem.new(ConfigCode.FocusColor, "選択中文字色", "Highlight color", Color.new(255, 255, 0)))
-    configArray.append(ConfigItem.new(ConfigCode.LogColor, "履歴文字色", "History log color", Color.new(192, 192, 192)))
+    configArray.append(ConfigItem.new(ConfigCode.ForeColor, "文字色", "Text color", Color(192, 192, 192)))
+    configArray.append(ConfigItem.new(ConfigCode.BackColor, "背景色", "Background color", Color(0, 0, 0)))
+    configArray.append(ConfigItem.new(ConfigCode.FocusColor, "選択中文字色", "Highlight color", Color(255, 255, 0)))
+    configArray.append(ConfigItem.new(ConfigCode.LogColor, "履歴文字色", "History log color", Color(192, 192, 192)))
     configArray.append(ConfigItem.new(ConfigCode.FPS, "フレーム毎秒", "FPS", 5));
     configArray.append(ConfigItem.new(ConfigCode.SkipFrame, "最大スキップフレーム数", "Skip frames", 3))
     configArray.append(ConfigItem.new(ConfigCode.ScrollHeight, "スクロール行数", "Lines per scroll", 1))
@@ -96,11 +96,11 @@ func setDefault() -> void:
     configArray.append(ConfigItem.new(ConfigCode.VarsizeDimConfig, "VARSIZEの次元指定をERD機能に合わせる", "Imitate ERD to VARSIZE dimension specification", false));
     configArray.append(ConfigItem.new(ConfigCode.CheckDuplicateIdentifier, "ERDで定義した識別子とローカル変数の重複を確認する", "Check duplicate ERD identifier and private variablea", false));
     configArray.append(ConfigItem.new(ConfigCode.ReplaceContinuationBR, "行連結の改行コードの置換文字列", "String of replacing new line code inside continuation", "\" \""));
-    configArray.append(ConfigItem.new(ConfigCode.ValidExtension, "LOADTEXTとSAVETEXTで使える拡張子", "Valid extensions for LOADTEXT and SAVETEXT", PackedStringArray.new(["txt"])));
+    configArray.append(ConfigItem.new(ConfigCode.ValidExtension, "LOADTEXTとSAVETEXTで使える拡張子", "Valid extensions for LOADTEXT and SAVETEXT", PackedStringArray(["txt"])));
     configArray.append(ConfigItem.new(ConfigCode.ZipSaveData, "セーブデータを圧縮して保存する", "Compress save data", false));
     configArray.append(ConfigItem.new(ConfigCode.EnglishConfigOutput, "CONFIGファイルの内容を英語で保存する", "Output English items in the config file", false));
-    configArray.append(ConfigItem.new(ConfigCode.EmueraLang, "Emueraの表示言語", "Emuera interface language", string.Empty));
-    configArray.append(ConfigItem.new(ConfigCode.EmueraIcon, "Emueraのアイコンのパス", "Path to a custom window icon", string.Empty));
+    configArray.append(ConfigItem.new(ConfigCode.EmueraLang, "Emueraの表示言語", "Emuera interface language", ""));
+    configArray.append(ConfigItem.new(ConfigCode.EmueraIcon, "Emueraのアイコンのパス", "Path to a custom window icon", ""));
     configArray.append(ConfigItem.new(ConfigCode.CBUseClipboard, "表示したテキストをクリップボードにコピーする", "Clipboard- Copy text to Clipboard during Game", false));
     configArray.append(ConfigItem.new(ConfigCode.CBIgnoreTags, "テキスト中の<>タグを無視する", "Clipboard- ignore <> tags in text", false));
     configArray.append(ConfigItem.new(ConfigCode.CBReplaceTags, "<>を次の文で置き換える", "Clipboard- Replace <> with this", "."));
@@ -117,38 +117,38 @@ func setDefault() -> void:
     configArray.append(ConfigItem.new(ConfigCode.CBMinTimer, "クリップボードの更新間隔(ミリ秒)", "Clipboard- min time between pastes", 800));
     configArray.append(ConfigItem.new(ConfigCode.RikaiEnabled, "Rikaichanを使用する", "Rikai- Enabled", false));
     configArray.append(ConfigItem.new(ConfigCode.RikaiFilename, "Rikaichanのファイルパス", "Rikai- Dictionary Filename", "Emuera-Rikai-edict.txt-eucjp"));
-    configArray.append(ConfigItem.new(ConfigCode.RikaiColorBack, "ポップアップの背景色", "Rikai- Back Color", Color.new(0, 0, 0x8B)))
-    configArray.append(ConfigItem.new(ConfigCode.RikaiColorText, "ポップアップの文字色", "Rikai- Text Color", Color.new(0xFF, 0xFF, 0xFF)))
+    configArray.append(ConfigItem.new(ConfigCode.RikaiColorBack, "ポップアップの背景色", "Rikai- Back Color", Color(0, 0, 0x8B)))
+    configArray.append(ConfigItem.new(ConfigCode.RikaiColorText, "ポップアップの文字色", "Rikai- Text Color", Color(0xFF, 0xFF, 0xFF)))
     configArray.append(ConfigItem.new(ConfigCode.RikaiUseSeparateBoxes, "翻訳中の語句を強調表示する", "Rikai- Use Separate Boxes", true));
 
     configArray.append(ConfigItem.new(ConfigCode.Ctrl_Z_Enabled, "Ctrl-Zで元に戻す機能を有効にする", "Enable undo with ctrl-z", false));
 
-    debugArray.Add(ConfigItem.new(ConfigCode.DebugShowWindow, "起動時にデバッグウインドウを表示する", "Show debug window on startup", true));
-    debugArray.Add(ConfigItem.new(ConfigCode.DebugWindowTopMost, "デバッグウインドウを最前面に表示する", "Debug window always on top", true));
-    debugArray.Add(ConfigItem.new(ConfigCode.DebugWindowWidth, "デバッグウィンドウ幅", "Debug window width", 400));
-    debugArray.Add(ConfigItem.new(ConfigCode.DebugWindowHeight, "デバッグウィンドウ高さ", "Debug window height", 300));
-    debugArray.Add(ConfigItem.new(ConfigCode.DebugSetWindowPos, "デバッグウィンドウ位置を指定する", "Fixed debug window starting position", false));
-    debugArray.Add(ConfigItem.new(ConfigCode.DebugWindowPosX, "デバッグウィンドウ位置X", "Debug window X position", 0));
-    debugArray.Add(ConfigItem.new(ConfigCode.DebugWindowPosY, "デバッグウィンドウ位置Y", "Debug window Y position", 0));
+    debugArray.append(ConfigItem.new(ConfigCode.DebugShowWindow, "起動時にデバッグウインドウを表示する", "Show debug window on startup", true));
+    debugArray.append(ConfigItem.new(ConfigCode.DebugWindowTopMost, "デバッグウインドウを最前面に表示する", "Debug window always on top", true));
+    debugArray.append(ConfigItem.new(ConfigCode.DebugWindowWidth, "デバッグウィンドウ幅", "Debug window width", 400));
+    debugArray.append(ConfigItem.new(ConfigCode.DebugWindowHeight, "デバッグウィンドウ高さ", "Debug window height", 300));
+    debugArray.append(ConfigItem.new(ConfigCode.DebugSetWindowPos, "デバッグウィンドウ位置を指定する", "Fixed debug window starting position", false));
+    debugArray.append(ConfigItem.new(ConfigCode.DebugWindowPosX, "デバッグウィンドウ位置X", "Debug window X position", 0));
+    debugArray.append(ConfigItem.new(ConfigCode.DebugWindowPosY, "デバッグウィンドウ位置Y", "Debug window Y position", 0));
 
-    replaceArray.Add(ConfigItem.new(ConfigCode.MoneyLabel, "お金の単位", "Currency symbol", "$"));
-    replaceArray.Add(ConfigItem.new(ConfigCode.MoneyFirst, "単位の位置", "Currency symbol position", true));
-    replaceArray.Add(ConfigItem.new(ConfigCode.LoadLabel, "起動時簡略表示", "Loading message", "Now Loading..."));
-    replaceArray.Add(ConfigItem.new(ConfigCode.MaxShopItem, "販売アイテム数", "Max shop item storage", 100));
-    replaceArray.Add(ConfigItem.new(ConfigCode.DrawLineString, "DRAWLINE文字", "DRAWLINE character", "-"));
-    replaceArray.Add(ConfigItem.new(ConfigCode.BarChar1, "BAR文字1", "BAR character 1", '*'));
-    replaceArray.Add(ConfigItem.new(ConfigCode.BarChar2, "BAR文字2", "BAR character 2", '.'));
-    replaceArray.Add(ConfigItem.new(ConfigCode.TitleMenuString0, "システムメニュー0", "System menu 0", "最初からはじめる"));
-    replaceArray.Add(ConfigItem.new(ConfigCode.TitleMenuString1, "システムメニュー1", "System menu 1", "ロードしてはじめる"));
-    replaceArray.Add(ConfigItem.new(ConfigCode.ComAbleDefault, "COM_ABLE初期値", "Default COM_ABLE", 1));
+    replaceArray.append(ConfigItem.new(ConfigCode.MoneyLabel, "お金の単位", "Currency symbol", "$"));
+    replaceArray.append(ConfigItem.new(ConfigCode.MoneyFirst, "単位の位置", "Currency symbol position", true));
+    replaceArray.append(ConfigItem.new(ConfigCode.LoadLabel, "起動時簡略表示", "Loading message", "Now Loading..."));
+    replaceArray.append(ConfigItem.new(ConfigCode.MaxShopItem, "販売アイテム数", "Max shop item storage", 100));
+    replaceArray.append(ConfigItem.new(ConfigCode.DrawLineString, "DRAWLINE文字", "DRAWLINE character", "-"));
+    replaceArray.append(ConfigItem.new(ConfigCode.BarChar1, "BAR文字1", "BAR character 1", '*'));
+    replaceArray.append(ConfigItem.new(ConfigCode.BarChar2, "BAR文字2", "BAR character 2", '.'));
+    replaceArray.append(ConfigItem.new(ConfigCode.TitleMenuString0, "システムメニュー0", "System menu 0", "最初からはじめる"));
+    replaceArray.append(ConfigItem.new(ConfigCode.TitleMenuString1, "システムメニュー1", "System menu 1", "ロードしてはじめる"));
+    replaceArray.append(ConfigItem.new(ConfigCode.ComAbleDefault, "COM_ABLE初期値", "Default COM_ABLE", 1));
 
-    replaceArray.Add(ConfigItem.new(ConfigCode.StainDefault, "汚れの初期値", "Default Stain", PackedInt64Array([0, 0, 2, 1, 8])))
-    replaceArray.Add(ConfigItem.new(ConfigCode.TimeupLabel, "時間切れ表示", "Time up message", "時間切れ"));
-    replaceArray.Add(ConfigItem.new(ConfigCode.ExpLvDef, "EXPLVの初期値", "Default EXPLV", PackedInt64Array([0, 1, 4, 20, 50, 200])));
+    replaceArray.append(ConfigItem.new(ConfigCode.StainDefault, "汚れの初期値", "Default Stain", PackedInt64Array([0, 0, 2, 1, 8])))
+    replaceArray.append(ConfigItem.new(ConfigCode.TimeupLabel, "時間切れ表示", "Time up message", "時間切れ"));
+    replaceArray.append(ConfigItem.new(ConfigCode.ExpLvDef, "EXPLVの初期値", "Default EXPLV", PackedInt64Array([0, 1, 4, 20, 50, 200])));
 
-    replaceArray.Add(ConfigItem.new(ConfigCode.PalamLvDef, "PALAMLVの初期値", "Default PALAMLV", PackedInt64Array([0, 100, 500, 3000, 10000, 30000, 60000, 100000, 150000, 250000])));
-    replaceArray.Add(ConfigItem.new(ConfigCode.pbandDef, "PBANDの初期値", "Default PBAND", 4));
-    replaceArray.Add(ConfigItem.new(ConfigCode.RelationDef, "RELATIONの初期値", "Default RELATION", 0));
+    replaceArray.append(ConfigItem.new(ConfigCode.PalamLvDef, "PALAMLVの初期値", "Default PALAMLV", PackedInt64Array([0, 100, 500, 3000, 10000, 30000, 60000, 100000, 150000, 250000])));
+    replaceArray.append(ConfigItem.new(ConfigCode.pbandDef, "PBANDの初期値", "Default PBAND", 4));
+    replaceArray.append(ConfigItem.new(ConfigCode.RelationDef, "RELATIONの初期値", "Default RELATION", 0));
 
 func Copy():
     var config := new();
@@ -163,24 +163,24 @@ func Copy():
             replaceArray[i].CopyTo(config.replaceArray[i]);
     return config;
 
-func GetConfigNameDic() -> Dictionary[ConfigCode, string]:
-    var ret : Dictionary[ConfigCode, string]
-    for item : ConfigItem.Base in configArray:
+func GetConfigNameDic() -> Dictionary[int, String]:
+    var ret : Dictionary[int, String]
+    for item : ConfigItem in configArray:
         if item:
             ret[item.Code] = "%s/%s" % [item.Text, item.EngText]
     return ret;
 
 func GetConfigValue(code : ConfigCode):
-    var item : ConfigItem.Base  = GetItem(code)
+    var item : ConfigItem  = GetItem(code)
     return item.Value;
 
 func GetConfigValueBool(code : ConfigCode):
-    var item : ConfigItem.Base  = GetItem(code)
-    return item.Value as Bool;
+    var item : ConfigItem  = GetItem(code)
+    return item.Value as bool;
 
-func GetItem(code : ConfigCode) -> ConfigItem.Base:
+func GetItem(code : ConfigCode) -> ConfigItem:
     if code is ConfigCode:
-        var item : ConfigItem.Base  = GetConfigItem(code)
+        var item : ConfigItem  = GetConfigItem(code)
         if not item:
             item = GetReplaceItem(code);
             if not item:
@@ -192,42 +192,42 @@ func GetItem(code : ConfigCode) -> ConfigItem.Base:
             item = GetDebugItemByString(code);
     return item
 
-func GetConfigItem(code) -> ConfigItem.Base:
+func GetConfigItem(code) -> ConfigItem:
     if code is ConfigCode:
-        for item : ConfigItem.Base in configArray:
+        for item : ConfigItem in configArray:
             if item and item.Code == code:
                 return item
         return null
     var key = code.to_upper()
-    for item : ConfigItem.Base in configArray:
+    for item : ConfigItem in configArray:
         if not item: continue
         if item.Name == key: return item
         if item.Text == key: return item
         if item.EngText == key: return item
     return null
 
-func GetReplaceItem(code) -> ConfigItem.Base:
+func GetReplaceItem(code) -> ConfigItem:
     if code is ConfigCode:
-        for item : ConfigItem.Base in replaceArray:
+        for item : ConfigItem in replaceArray:
             if item and item.Code == code:
                 return item
         return null
     var key = code.to_upper()
-    for item : ConfigItem.Base in replaceArray:
+    for item : ConfigItem in replaceArray:
         if not item: continue
         if item.Name == key: return item
         if item.Text == key: return item
         if item.EngText == key: return item
     return null
 
-func GetDebugItem(code) -> ConfigItem.Base:
+func GetDebugItem(code) -> ConfigItem:
     if code is ConfigCode:
-        for item : ConfigItem.Base in debugArray:
+        for item : ConfigItem in debugArray:
             if item and item.Code == code:
                 return item
         return null
     var key = code.to_upper()
-    for item : ConfigItem.Base in debugArray:
+    for item : ConfigItem in debugArray:
         if not item: continue
         if item.Name == key: return item
         if item.Text == key: return item
@@ -235,55 +235,34 @@ func GetDebugItem(code) -> ConfigItem.Base:
     return null
 
 static func GetConfigValueInERB(text : String) -> SingleTerm:
-    var item : ConfigItem.Base = Instance.GetItem(text)
+    var item : ConfigItem = Instance.GetItem(text)
     if not item:
         #errMes = string.Format(trerror.InvalidConfigName.Text, text);
         return null;
     var term : SingleTerm
     match item.Code:
-        ConfigCode.AutoSave:
+        ConfigCode.AutoSave, ConfigCode.MoneyFirst:
             if (item.Value is bool):
                 term = SingleLongTerm.new(1);
             else:
                 term = SingleLongTerm.new(0);
-        ConfigCode.MoneyFirst:
-            if (item.Value is bool):
-                term = SingleLongTerm.new(1);
-            else:
-                term = SingleLongTerm.new(0);
-        ConfigCode.WindowX:
-        ConfigCode.PrintCPerLine:
-        ConfigCode.PrintCLength:
-        ConfigCode.FontSize:
-        ConfigCode.LineHeight:
-        ConfigCode.SaveDataNos:
-        ConfigCode.MaxShopItem:
-        ConfigCode.ComAbleDefault:
-            term = SingleLongTerm.new(item.GetValue());
-        case ConfigCode.ForeColor:
-        case ConfigCode.BackColor:
-        case ConfigCode.FocusColor:
-        case ConfigCode.LogColor:
+        ConfigCode.WindowX, ConfigCode.PrintCPerLine, ConfigCode.PrintCLength, ConfigCode.FontSize, \
+        ConfigCode.LineHeight, ConfigCode.SaveDataNos, ConfigCode.MaxShopItem, ConfigCode.ComAbleDefault:
+            term = SingleLongTerm.new(item.GetValue())
+        ConfigCode.ForeColor, ConfigCode.BackColor, ConfigCode.FocusColor, ConfigCode.LogColor:
             var color : Color = item.GetValue();
             term = SingleLongTerm.new(((color.r * 256) + color.g) * 256 + color.b)
-        case ConfigCode.pbandDef:
-        case ConfigCode.RelationDef:
-				term = SingleLongTerm.new(item.GetValue<long>());
-        case ConfigCode.FontName:
-        case ConfigCode.MoneyLabel:
-        case ConfigCode.LoadLabel:
-        case ConfigCode.DrawLineString:
-        case ConfigCode.TitleMenuString0:
-        case ConfigCode.TitleMenuString1:
-        case ConfigCode.TimeupLabel:
+        ConfigCode.pbandDef, ConfigCode.RelationDef:
+            term = SingleLongTerm.new(item.GetValue())
+        ConfigCode.FontName, ConfigCode.MoneyLabel, ConfigCode.LoadLabel, ConfigCode.DrawLineString, \
+        ConfigCode.TitleMenuString0, ConfigCode.TitleMenuString1, ConfigCode.TimeupLabel:
             term = SingleStrTerm.new(item.GetValue());
-        
-        case ConfigCode.BarChar1:
-        case ConfigCode.BarChar2:
+        ConfigCode.BarChar1, ConfigCode.BarChar2:
             term = SingleStrTerm.new(item.GetValue());
-        case ConfigCode.TextDrawingMode:
-            term = SingleStrTerm.new(str(item.GetValue()));
+        ConfigCode.TextDrawingMode:
+            term = SingleStrTerm.new(str(item.GetValue()))
         default:
+            print("Enum.IsDefined to be implemented.")
             if (Enum.IsDefined(typeof(ConfigCode), item.Code)):
                 match item.ValueToString():
                     "YES":
@@ -292,23 +271,23 @@ static func GetConfigValueInERB(text : String) -> SingleTerm:
                         term = SingleLongTerm.new (0);
                     default:
                         var val = item.ValueToString()
-                        if (long.TryParse(val, out long i)):
-                            term = SingleLongTerm.new (i);
+                        if val.is_valid_int():
+                            term = SingleLongTerm.new(val.to_int());
                         else:
                             term = SingleStrTerm.new(val);
             else:
                 #errMes = string.Format(trerror.NotAllowGetConfigValue.Text, text);
                 return null;
 
-func SaveConfig() -> bool
+func SaveConfig() -> bool:
     var writer : StreamWriter = null;
     writer = StreamWriter.new(configPath, false, Config.Encode);
     for i in configArray.size():
         var item := configArray[i];
         if not item: continue;
         if (item.Code == ConfigCode.CompatiDRAWLINE): continue;
-        if ((item.Code == ConfigCode.ChangeMasterNameIfDebug) && item.GetValue<bool>()): continue;
-        if ((item.Code == ConfigCode.LastKey) && (item.GetValue<long>() == 0)): continue;
+        if ((item.Code == ConfigCode.ChangeMasterNameIfDebug) && item.GetValue()): continue
+        if ((item.Code == ConfigCode.LastKey) && (item.GetValue() == 0)): continue
         if (item.Code == ConfigCode.ValidExtension):
             var ex = item;
             var sb = ""
@@ -318,249 +297,133 @@ func SaveConfig() -> bool
                 sb = ex.text
             sb += ":"
             sb += ",".join(ex.Value)
-            writer.WriteLine(sb.ToString());
+            writer.WriteLine(sb)
+            continue
+        writer.WriteLine(str(item))
+
+func ReLoadConfig() -> bool:
+    for item in configArray:
+        if not item == null:
             continue;
-        writer.WriteLine(item.ToString());
+        if (item.Fixed):
+            item.Fixed = false
+    LoadConfig()
+    return true
 
-	public bool ReLoadConfig()
-	{
-		
-		foreach (AConfigItem item in configArray)
-		{
-			if (item == null)
-				continue;
-			if (item.Fixed)
-				item.Fixed = false;
-		}
-		LoadConfig();
-		return true;
-	}
+func LoadConfig() -> bool:
+    var defaultConfigPath : String = Program.CsvDir + "_default.config"
+    var fixedConfigPath : String = Program.CsvDir + "_fixed.config"
+    if (!File.Exists(defaultConfigPath)):
+        defaultConfigPath = Program.CsvDir + "default.config"
+    if (!File.Exists(fixedConfigPath)):
+        fixedConfigPath = Program.CsvDir + "fixed.config"
 
-	public bool LoadConfig()
-	{
-		string defaultConfigPath = Program.CsvDir + "_default.config";
-		string fixedConfigPath = Program.CsvDir + "_fixed.config";
-		if (!File.Exists(defaultConfigPath))
-			defaultConfigPath = Program.CsvDir + "default.config";
-		if (!File.Exists(fixedConfigPath))
-			fixedConfigPath = Program.CsvDir + "fixed.config";
+    loadConfig(defaultConfigPath, false);
+    loadConfig(configPath, false);
+    loadConfig(fixedConfigPath, true);
 
-		loadConfig(defaultConfigPath, false);
-		loadConfig(configPath, false);
-		loadConfig(fixedConfigPath, true);
+    Config.SetConfig(this);
+    var needSave := false;
+    if (!File.Exists(configPath)):
+        needSave = true;
+    if (Config.CheckUpdate()):
+        GetItem(ConfigCode.LastKey).SetValue(Config.LastKey)
+        needSave = true;
+    if (needSave):
+        SaveConfig()
+    return true
 
-		Config.SetConfig(this);
-		bool needSave = false;
-		if (!File.Exists(configPath))
-			needSave = true;
-		if (Config.CheckUpdate())
-		{
-			GetItem(ConfigCode.LastKey).SetValue(Config.LastKey);
-			needSave = true;
-		}
-		if (needSave)
-			SaveConfig();
-		return true;
-	}
+func LoadConfig2(confPath : String, fix : bool) -> bool:
+    if (!File.Exists(confPath)):
+        return false
+    var eReader := EraStreamReader.new(false)
+    if (!eReader.Open(confPath)):
+        return false;
+    var pos : ScriptPosition = null
+    var line : String = null
 
-	private bool loadConfig(string confPath, bool fix)
-	{
-		if (!File.Exists(confPath))
-			return false;
-		using var eReader = new EraStreamReader(false);
-		if (!eReader.Open(confPath))
-			return false;
-		ScriptPosition? pos = null;
-		try
-		{
-			string line = null;
-			
-			while ((line = eReader.ReadLine()) != null)
-			{
-				if ((line.Length == 0) || (line[0] == ';'))
-					continue;
-				pos = new ScriptPosition(eReader.Filename, eReader.LineNo);
-				string[] tokens = line.Split([':']);
-				if (tokens.Length < 2)
-					continue;
-				#region EM_私家版_Emuera多言語化改造
-				AConfigItem item = GetConfigItem(tokens[0].Trim());
-				#endregion
-				if (item != null)
-				{
-					
-					if (item.Code == ConfigCode.CompatiDRAWLINE)
-					{
-						item = GetConfigItem(ConfigCode.CompatiLinefeedAs1739);
-					}
-					if (item.Code == ConfigCode.TextEditor)
-					{
-						
-						if (tokens.Length > 2)
-						{
-							if (tokens[2].StartsWith('\\'))
-								tokens[1] += ":" + tokens[2];
-							if (tokens.Length > 3)
-							{
-								for (int i = 3; i < tokens.Length; i++)
-								{
-									tokens[1] += ":" + tokens[i];
-								}
-							}
-						}
-					}
-					if (item.Code == ConfigCode.EditorArgument)
-					{
-						
-						((ConfigItem<string>)item).Value = tokens[1];
-						continue;
-					}
-					if (item.Code == ConfigCode.MaxLog && Program.AnalysisMode)
-					{
-						
-						tokens[1] = "10000";
-					}
-					if (item.TryParse(tokens[1]) && fix)
-						item.Fixed = true;
-				}
-			}
-		}
-		catch (EmueraException ee)
-		{
-			ParserMediator.ConfigWarn(ee.Message, pos, 1, null);
-		}
-		catch (Exception exc)
-		{
-			ParserMediator.ConfigWarn(exc.GetType().ToString() + ":" + exc.Message, pos, 1, exc.StackTrace);
-		}
-		finally { eReader.Dispose(); }
-		return true;
-	}
+    line = eReader.ReadLine()
+    while line != null:
+        if ((line.Length == 0) || (line[0] == ';')):
+            continue;
+        pos = ScriptPosition.new(eReader.Filename, eReader.LineNo)
+        var tokens :  = ":".split(line)
+        if (tokens.Length < 2):
+            continue;
+        var item : ConfigItem = GetConfigItem(tokens[0].Trim())
+        if (item != null):
+            if (item.Code == ConfigCode.CompatiDRAWLINE):
+                item = GetConfigItem(ConfigCode.CompatiLinefeedAs1739)
+                if (item.Code == ConfigCode.TextEditor):
+                    if (tokens.Length > 2):
+                        if (tokens[2].StartsWith('\\')):
+                            tokens[1] += ":" + tokens[2];
+                        if (tokens.Length > 3):
+                            for i in range(3, tokens.size()):
+                                tokens[1] += ":" + tokens[i];
+                if (item.Code == ConfigCode.EditorArgument):
+                    item.Value = tokens[1]
+                    continue;
+                if (item.Code == ConfigCode.MaxLog && Program.AnalysisMode):
+                    tokens[1] = "10000"
+                if (item.TryParse(tokens[1]) && fix):
+                    item.Fixed = true;
+        line = eReader.ReadLine()
+    return true
 
-	#region replace
-	
-	public void LoadReplaceFile(string filename)
-	{
-		using var eReader = new EraStreamReader(false);
-		if (!eReader.Open(filename))
-			return;
-		ScriptPosition? pos = null;
-		try
-		{
-			string line = null;
-			while ((line = eReader.ReadLine()) != null)
-			{
-				line = line.Trim();
-				if (line.Length == 0)
-					continue;
-				if (line[0] == ';')
-					continue;
-				pos = new ScriptPosition(eReader.Filename, eReader.LineNo);
-				string[] tokens = line.Split(',', ':');
-				if (tokens.Length < 2)
-					continue;
-				string itemName = tokens[0].Trim();
-				tokens[1] = line[(tokens[0].Length + 1)..];
-				if (string.IsNullOrEmpty(tokens[1].Trim()))
-					continue;
-				AConfigItem item = GetReplaceItem(itemName);
-				if (item != null)
-					item.TryParse(tokens[1]);
-			}
-		}
-		catch (EmueraException ee)
-		{
-			ParserMediator.Warn(ee.Message, pos, 1);
-		}
-		catch (Exception exc)
-		{
-			ParserMediator.Warn(exc.GetType().ToString() + ":" + exc.Message, pos, 1, exc.StackTrace);
-		}
-		finally { eReader.Dispose(); }
-	}
+func LoadReplaceFile(filename : String):
+    var eReader := EraStreamReader.new(false)
+    if (!eReader.Open(filename)):
+        return
+    var pos : ScriptPosition = null
+    var line : String = null
+    line = eReader.ReadLine()
+    while line != null:
+        line = line.trim_prefix(" ").trim_suffix(" ")
+        if (line.length() == 0):
+            continue;
+        if (line[0] == ';'):
+            continue;
+        pos = ScriptPosition.new(eReader.Filename, eReader.LineNo)
+        var tokens := line.split(RegEx.new("[,:]"))
+        if (tokens.size() < 2):
+            continue;
+        var itemName : String = tokens[0].trim_prefix(" ").trim_suffix(" ")
+        tokens[1] = line.get_slice(tokens[0].size())
+        if tokens[1].trim_prefix(" ").trim_suffix(" ").is_empty():
+            continue;
+        var item : ConfigItem = GetReplaceItem(itemName)
+        if (item != null):
+            item.TryParse(tokens[1]);
 
-	#endregion
+func SaveDebugConfig() -> bool:
+    var writer : StreamWriter = null;
+    writer = StreamWriter.new(configdebugPath, false, Config.Encode)
 
-	#region debug
+    for item in debugArray:
+        if (item == null):
+            continue;
+        writer.WriteLine(str(item))
+    return true
 
-
-	public bool SaveDebugConfig()
-	{
-		StreamWriter writer = null;
-		try
-		{
-			#region EM_私家版_Emuera多言語化改造
-			
-			writer = new StreamWriter(configdebugPath, false, Config.Encode);
-
-			
-			for (int i = 0; i < debugArray.Count; i++)
-			#endregion
-			{
-				AConfigItem item = debugArray[i];
-				if (item == null)
-					continue;
-				writer.WriteLine(item.ToString());
-			}
-		}
-		catch (Exception)
-		{
-			return false;
-		}
-		finally
-		{
-			if (writer != null)
-				writer.Close();
-		}
-		return true;
-	}
-
-	public bool LoadDebugConfig()
-	{
-		using var eReader = new EraStreamReader(false);
-		if (!File.Exists(configdebugPath))
-			goto err;
-		if (!eReader.Open(configdebugPath))
-			goto err;
-		ScriptPosition? pos = null;
-		try
-		{
-			string line = null;
-			while ((line = eReader.ReadLine()) != null)
-			{
-				if ((line.Length == 0) || (line[0] == ';'))
-					continue;
-				pos = new ScriptPosition(eReader.Filename, eReader.LineNo);
-				string[] tokens = line.Split([':']);
-				if (tokens.Length < 2)
-					continue;
-				AConfigItem item = GetDebugItem(tokens[0].Trim());
-				if (item != null)
-				{
-					item.TryParse(tokens[1]);
-				}
-#if DEBUG
-				
-				
-#endif
-			}
-		}
-		catch (EmueraException ee)
-		{
-			ParserMediator.ConfigWarn(ee.Message, pos, 1, null);
-			goto err;
-		}
-		catch (Exception exc)
-		{
-			ParserMediator.ConfigWarn(exc.GetType().ToString() + ":" + exc.Message, pos, 1, exc.StackTrace);
-			goto err;
-		}
-		finally { eReader.Dispose(); }
-		Config.SetDebugConfig(this);
-		return true;
-	err:
-		Config.SetDebugConfig(this);
-		return false;
-	}
-
-	#endregion
+func LoadDebugConfig() -> bool:
+    var eReader = EraStreamReader.new(false)
+    if (!File.Exists(configdebugPath)):
+        return false
+    if (!eReader.Open(configdebugPath)):
+        return false
+    var pos : ScriptPosition = null
+    var line: String = null
+    line = eReader.ReadLine()
+    while line!= null:
+        if ((line.length() == 0) || (line[0] == ';')):
+            continue;
+        pos = ScriptPosition.new(eReader.Filename, eReader.LineNo)
+        var tokens = line.split(":")
+        if (tokens.size() < 2):
+            continue;
+        var item := GetDebugItem(tokens[0].trim_prefix(" ").trim_suffix(" "))
+        if (item != null):
+            item.TryParse(tokens[1])
+        Config.SetDebugConfig(this)
+    return true

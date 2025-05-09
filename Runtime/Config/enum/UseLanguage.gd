@@ -2,6 +2,14 @@ class_name UseLanguage
 
 var value : InternalEnum
 
+enum
+{
+    JAPANESE = 0,
+    KOREAN = 1,
+    CHINESE_HANS = 2,
+    CHINESE_HANT = 3,
+}
+
 enum InternalEnum
 {
     JAPANESE = 0,

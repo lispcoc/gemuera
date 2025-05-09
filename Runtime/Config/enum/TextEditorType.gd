@@ -2,6 +2,14 @@ class_name TextEditorType
 
 var value : InternalEnum
 
+enum
+{
+    SAKURA = 0,
+    TERAPAD = 1,
+    EMEDITOR = 2,
+    USER_SETTING = 3,
+}
+
 enum InternalEnum
 {
     SAKURA = 0,

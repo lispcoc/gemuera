@@ -2,9 +2,9 @@ class_name ReduceArgumentOnLoadFlag
 
 var value : InternalEnum
 
-var YES : ReduceArgumentOnLoadFlag = new(InternalEnum.YES)
-var ONCE : ReduceArgumentOnLoadFlag = new(InternalEnum.ONCE)
-var NO : ReduceArgumentOnLoadFlag = new(InternalEnum.NO)
+static var YES : ReduceArgumentOnLoadFlag = new(InternalEnum.YES)
+static var ONCE : ReduceArgumentOnLoadFlag = new(InternalEnum.ONCE)
+static var NO : ReduceArgumentOnLoadFlag = new(InternalEnum.NO)
 
 enum InternalEnum
 {

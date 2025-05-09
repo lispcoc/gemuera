@@ -1,11 +1,5 @@
 class_name ConfigCode
 
-static func get_string(code : int):
-    for key in ConfigCode.ConfigCode.keys():
-        if ConfigCode.ConfigCode.get(key) == code:
-            return key
-    return "IgnoreCase"
-
 enum
 {
 	IgnoreCase = 0,
@@ -173,13 +167,6 @@ enum ReduceArgumentOnLoadFlag
     YES = 0,
     ONCE = 1,
     NO = 2,
-}
-
-enum TextDrawingMode
-{
-    GRAPHICS = 0,
-    TEXTRENDERER = 1,
-    WINAPI = 2,
 }
 
 enum UseLanguage
