@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using System.Text;
+using System.Text.RegularExpressions;
 using EraConfig = MinorShift.Emuera.Runtime.Config.Config;
 
 namespace Gemuera.UI;
@@ -64,6 +65,24 @@ public partial class ConsoleNode : Control, IGameConsole
 
     // Output queue (interpreter thread → UI thread)
     private readonly ConcurrentQueue<Action> _uiQueue = new();
+
+    // Tracks how much of _bbcodeAccum was present when the last INPUT was set up.
+    // ConvertNumberPatterns is applied only to content added after this position.
+    private int _lastInputPos = 0;
+
+    // Parallel accumulator that mirrors every AppendText call so we can read back
+    // the raw BBCode (RichTextLabel.Text is NOT updated by AppendText).
+    private readonly StringBuilder _bbcodeAccum = new();
+
+    // Regex to detect existing [url=…]…[/url] blocks (skip these during auto-linkify).
+    private static readonly Regex _urlTagRegex =
+        new(@"\[url=[^\]]*\].*?\[/url\]",
+            RegexOptions.Singleline | RegexOptions.Compiled);
+    // Match [lb]N] plus anything after it up to newline, [lb], or a closing BBCode tag [/.
+    // Captures group 1 = number, group 2 = trailing text on the same option.
+    private static readonly Regex _bracketNumRegex =
+        new(@"\[lb\](\d+)\]((?:(?!\[lb\])(?!\[/)(?!\n).)*)",
+            RegexOptions.Compiled);
 
     // ----------------------------------------------------------------
     // Godot lifecycle
@@ -186,12 +205,12 @@ public partial class ConsoleNode : Control, IGameConsole
     {
         if (string.IsNullOrEmpty(text)) return;
         string bbcode = ToBbcode(text, style);
-        Enqueue(() => _richText.AppendText(bbcode));
+        Enqueue(() => { _richText.AppendText(bbcode); _bbcodeAccum.Append(bbcode); });
     }
 
     public void PrintNewLine()
     {
-        Enqueue(() => _richText.AppendText("\n"));
+        Enqueue(() => { _richText.AppendText("\n"); _bbcodeAccum.Append('\n'); });
     }
 
     public void PrintLine(string lineChar)
@@ -205,15 +224,17 @@ public partial class ConsoleNode : Control, IGameConsole
             int count = px > 0 ? System.Math.Max(20, (int)(px / charWidth)) : 60;
             string ruleBb = $"[color=#888888]{new string(ch, count)}[/color]\n";
             _richText.AppendText(ruleBb);
+            _bbcodeAccum.Append(ruleBb);
         });
     }
 
     public void ClearLine(int count)
     {
-        // Remove the last `count` lines from the RichTextLabel text
+        // Remove the last `count` lines from the accumulated BBCode buffer
         Enqueue(() =>
         {
-            string full = _richText.Text;
+            string full = _bbcodeAccum.ToString();
+            int oldLen = full.Length;
             for (int i = 0; i < count; i++)
             {
                 int nl = full.LastIndexOf('\n', full.Length - 2);
@@ -221,19 +242,22 @@ public partial class ConsoleNode : Control, IGameConsole
                 full = full[..(nl + 1)];
             }
             _richText.Text = full;
+            _bbcodeAccum.Clear();
+            _bbcodeAccum.Append(full);
+            _lastInputPos = System.Math.Max(0, _lastInputPos - (oldLen - full.Length));
         });
     }
 
     public void ClearScreen()
     {
-        Enqueue(() => _richText.Clear());
+        Enqueue(() => { _richText.Clear(); _bbcodeAccum.Clear(); _lastInputPos = 0; });
     }
 
     public void PrintHtml(string html)
     {
         // Convert ERA HTML subset to BBCode (basic mapping)
-        string bbcode = HtmlToBbcode(html);
-        Enqueue(() => _richText.AppendText(bbcode + "\n"));
+        string bbcode = HtmlToBbcode(html) + "\n";
+        Enqueue(() => { _richText.AppendText(bbcode); _bbcodeAccum.Append(bbcode); });
     }
 
     public void PrintImage(string resourcePath, int width, int height, int align)
@@ -244,15 +268,23 @@ public partial class ConsoleNode : Control, IGameConsole
         string alignTag = align switch { 1 => "center", 2 => "right", _ => "left" };
         string sizeAttr = (width > 0 && height > 0) ? $" width={width} height={height}" : "";
         string bb = $"[{alignTag}][img{sizeAttr}]{resourcePath}[/img][/{alignTag}]\n";
-        Enqueue(() => _richText.AppendText(bb));
+        Enqueue(() => { _richText.AppendText(bb); _bbcodeAccum.Append(bb); });
     }
 
     public void PrintButton(string displayText, string inputValue, StringStyle style)
     {
         // Render as a URL anchor; clicking fires input.
-        // inputValue is used verbatim as the url attribute so OnMetaClicked receives it unmodified.
-        string bb = $"[url={EscapeBb(inputValue)}]{ToBbcode(displayText, style)}[/url]";
-        Enqueue(() => _richText.AppendText(bb));
+        // Alignment must wrap OUTSIDE the [url] tag for correct Godot BBCode rendering.
+        int align = style?.Align ?? 0;
+        string alignTag = align switch { 1 => "center", 2 => "right", _ => null };
+
+        // Build style without alignment for the inner text (alignment handled by outer tag).
+        StringStyle innerStyle = style?.Clone();
+        if (innerStyle != null) innerStyle.Align = 0;
+
+        string urlBb = $"[url={EscapeBb(inputValue)}]{ToBbcode(displayText, innerStyle)}[/url]";
+        string bb = alignTag != null ? $"[{alignTag}]{urlBb}[/{alignTag}]" : urlBb;
+        Enqueue(() => { _richText.AppendText(bb); _bbcodeAccum.Append(bb); });
     }
 
     public void SetForeColor(int argb) => _fgArgb = argb;
@@ -442,6 +474,31 @@ public partial class ConsoleNode : Control, IGameConsole
 
         Enqueue(() =>
         {
+            // Auto-linkify [N] patterns (from PRINT "[N] text" + INPUT style menus)
+            // for integer-based input types. Only the output since the last INPUT is scanned.
+            if (request.InputType == InputType.IntValue
+                || request.InputType == InputType.IntButton
+                || request.InputType == InputType.AnyValue)
+            {
+                // NOTE: _richText.Text is NOT updated by AppendText(), so we use _bbcodeAccum.
+                string fullBb = _bbcodeAccum.ToString();
+                GD.Print($"[ConsoleNode] Linkify: accum.Length={fullBb.Length}, lastPos={_lastInputPos}");
+                if (_lastInputPos < fullBb.Length)
+                {
+                    string newSection = fullBb[_lastInputPos..];
+                    string converted = ConvertNumberPatterns(newSection);
+                    if (converted != newSection)
+                    {
+                        string finalBb = string.Concat(fullBb.AsSpan(0, _lastInputPos), converted);
+                        _richText.Text = finalBb;
+                        _bbcodeAccum.Clear();
+                        _bbcodeAccum.Append(finalBb);
+                        GD.Print($"[ConsoleNode] Linkify applied, new length={finalBb.Length}");
+                    }
+                }
+            }
+            _lastInputPos = _bbcodeAccum.Length;
+
             _inputLine.Clear();
 
             switch (request.InputType)
@@ -460,15 +517,15 @@ public partial class ConsoleNode : Control, IGameConsole
                     break;
 
                 case InputType.EnterKey:
-                    // Just press Enter to continue
-                    _inputLine.PlaceholderText = "Enterキーで続ける / Press Enter";
+                    // Enter key or mouse click continues
+                    _inputLine.PlaceholderText = "クリックかEnterキーで続ける / Click or press Enter";
                     _inputLine.Editable = true;
                     _inputLine.GrabFocus();
                     break;
 
                 case InputType.AnyKey:
-                    // Any key or Enter continues
-                    _inputLine.PlaceholderText = "何かキーを押してください / Press any key";
+                    // Any key, click, or Enter continues
+                    _inputLine.PlaceholderText = "クリックか何かキーを押してください / Click or press any key";
                     _inputLine.Editable = true;
                     _inputLine.GrabFocus();
                     break;
@@ -544,10 +601,10 @@ public partial class ConsoleNode : Control, IGameConsole
     // Handle button (URL) clicks in RichTextLabel
     private void OnMetaClicked(Variant meta)
     {
+        string val = meta.AsString();
+        GD.Print($"[ConsoleNode] MetaClicked: meta='{val}', pending={_pendingRequest?.InputType}, tcsNull={_inputTcs == null}, completed={_inputTcs?.Task.IsCompleted}");
         var tcs = _inputTcs;
         if (tcs == null || tcs.Task.IsCompleted) return;
-
-        string val = meta.AsString();
         _inputLine.Editable = false;
         _inputLine.PlaceholderText = "入力してEnterキー / Type and press Enter";
         tcs.TrySetResult(new InputResult
@@ -636,6 +693,18 @@ public partial class ConsoleNode : Control, IGameConsole
                 });
             }
         }
+
+        // EnterKey / AnyKey: any mouse button press advances (same as pressing Enter / any key)
+        if (@event is InputEventMouseButton advBtn && advBtn.Pressed
+            && tcs != null && !tcs.Task.IsCompleted)
+        {
+            if (req?.InputType == InputType.AnyKey || req?.InputType == InputType.EnterKey)
+            {
+                _inputLine.Editable = false;
+                _inputLine.PlaceholderText = "入力してEnterキー / Type and press Enter";
+                tcs.TrySetResult(new InputResult { Value = "" });
+            }
+        }
     }
 
     public void DoRedraw()
@@ -653,7 +722,9 @@ public partial class ConsoleNode : Control, IGameConsole
     {
         Enqueue(() =>
         {
-            _richText.AppendText($"\n[color=#ff4444][b]FATAL ERROR:[/b] {EscapeBb(message)}[/color]\n");
+            string bb = $"\n[color=#ff4444][b]FATAL ERROR:[/b] {EscapeBb(message)}[/color]\n";
+            _richText.AppendText(bb);
+            _bbcodeAccum.Append(bb);
             _inputLine.Editable = false;
             GD.PrintErr($"[Gemuera] FATAL: {message}");
         });
@@ -749,6 +820,34 @@ public partial class ConsoleNode : Control, IGameConsole
     private static string EscapeBb(string s)
     {
         return s.Replace("[", "[lb]");
+    }
+
+    /// <summary>
+    /// Converts [lb]N] patterns (ERA's escaped "[N]") in the given BBCode string to
+    /// clickable [url=N] links. Sections already inside [url=…]…[/url] are preserved as-is.
+    /// Called when an integer INPUT is requested so that plain PRINT menus become clickable.
+    /// </summary>
+    private static string ConvertNumberPatterns(string bbCode)
+    {
+        if (bbCode.Length == 0) return bbCode;
+        var sb = new StringBuilder(bbCode.Length + 64);
+        int lastIdx = 0;
+        foreach (Match m in _urlTagRegex.Matches(bbCode))
+        {
+            // Convert text BEFORE this url block
+            // group 1 = number, group 2 = trailing text (the option label after the [N])
+            sb.Append(_bracketNumRegex.Replace(
+                bbCode[lastIdx..m.Index],
+                match => $"[url={match.Groups[1].Value}][lb]{match.Groups[1].Value}]{match.Groups[2].Value}[/url]"));
+            // Preserve existing url block unchanged
+            sb.Append(m.Value);
+            lastIdx = m.Index + m.Length;
+        }
+        // Convert any remaining text after the last url block
+        sb.Append(_bracketNumRegex.Replace(
+            bbCode[lastIdx..],
+            match => $"[url={match.Groups[1].Value}][lb]{match.Groups[1].Value}]{match.Groups[2].Value}[/url]"));
+        return sb.ToString();
     }
 
     private static Color GodotColorFromArgb(int argb)

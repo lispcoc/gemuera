@@ -230,8 +230,10 @@ internal sealed partial class Process
 
 		console.PrintBar();
 		console.NewLine();
-		console.PrintSingleLine("[0] " + Config.TitleMenuString0);
-		console.PrintSingleLine("[1] " + Config.TitleMenuString1);
+		console.PrintButton("[0] " + Config.TitleMenuString0, 0L);
+		console.NewLine();
+		console.PrintButton("[1] " + Config.TitleMenuString1, 1L);
+		console.NewLine();
 		openingInput();
 		return;
 	}
@@ -371,7 +373,7 @@ internal sealed partial class Process
 				comAble[lastAddCom] = lastCalledComable;
 				if (!isCTrain)
 				{
-					console.PrintC(getTrainComString(lastCalledComable, lastAddCom), true);
+					console.PrintButtonC(getTrainComString(lastCalledComable, lastAddCom), lastAddCom, true);
 					printComCount++;
 					if ((Config.PrintCPerLine > 0) && (printComCount % Config.PrintCPerLine == 0))
 						console.PrintFlush(false);
@@ -393,7 +395,7 @@ internal sealed partial class Process
 				comAble[lastAddCom] = lastCalledComable;
 				if (!isCTrain)
 				{
-					console.PrintC(getTrainComString(lastCalledComable, lastAddCom), true);
+					console.PrintButtonC(getTrainComString(lastCalledComable, lastAddCom), lastAddCom, true);
 					printComCount++;
 					if ((Config.PrintCPerLine > 0) && (printComCount % Config.PrintCPerLine == 0))
 						console.PrintFlush(false);
@@ -921,41 +923,48 @@ internal sealed partial class Process
 			dataIsAvailable = new bool[Config.SaveDataNos + 1];
 		}
 		int dataNo;
+		// 前ページへのナビゲーションボタン
 		for (int i = 0; i < page; i++)
 		{
-			console.PrintFlush(false);
-			console.Print(string.Format(trsl.DisplaySaveSlot.Text, i * 20, i * 20 + 19));
+			int pageStart = i * 20;
+			console.PrintButton(string.Format(trsl.DisplaySaveSlot.Text, pageStart, pageStart + 19), (long)pageStart);
+			console.NewLine();
 		}
+		// 現在ページのセーブスロット
 		for (int i = 0; i < 20; i++)
 		{
 			dataNo = page * 20 + i;
 			if (dataNo == dataIsAvailable.Length - 1)
 				break;
 			dataIsAvailable[dataNo] = false;
-			console.PrintFlush(false);
-			console.Print(string.Format("[{0, 2}] ", dataNo));
-			if (!writeSavedataTextFrom(dataNo))
-				continue;
-			dataIsAvailable[dataNo] = true;
+			string dataMes;
+			bool avail = writeSavedataTextFrom(dataNo, out dataMes);
+			console.PrintButton(string.Format("[{0, 2}] ", dataNo) + dataMes, (long)dataNo);
+			console.NewLine();
+			if (avail)
+				dataIsAvailable[dataNo] = true;
 		}
+		// 後ページへのナビゲーションボタン
 		for (int i = page; i < ((dataIsAvailable.Length - 2) / 20); i++)
 		{
-			console.PrintFlush(false);
-			console.Print(string.Format(trsl.DisplaySaveSlot.Text, (i + 1) * 20, (i + 1) * 20 + 19));
+			int nextPageStart = (i + 1) * 20;
+			console.PrintButton(string.Format(trsl.DisplaySaveSlot.Text, nextPageStart, nextPageStart + 19), (long)nextPageStart);
+			console.NewLine();
 		}
 		//オートセーブの処理は別途切り出し（表示処理の都合上）
 		dataIsAvailable[^1] = false;
 		if (state.SystemState != SystemStateCode.SaveGame_Begin)
 		{
 			dataNo = AutoSaveIndex;
-			console.PrintFlush(false);
-			console.Print(string.Format("[{0, 2}] ", dataNo));
-			if (writeSavedataTextFrom(dataNo))
+			string autoMes;
+			if (writeSavedataTextFrom(dataNo, out autoMes))
 				dataIsAvailable[^1] = true;
+			console.PrintButton(string.Format("[{0, 2}] ", dataNo) + autoMes, (long)dataNo);
+			console.NewLine();
 		}
-		console.RefreshStrings(false);
 		//描画全部終わり
-		console.PrintSingleLine("[100] 戻る");
+		console.PrintButton("[100] 戻る", 100L);
+		console.NewLine();
 		setWaitInput();
 		if (state.SystemState == SystemStateCode.SaveGame_Begin)
 			state.SystemState = SystemStateCode.SaveGame_WaitInput;
@@ -1003,8 +1012,9 @@ internal sealed partial class Process
 		if (available)
 		{
 			console.PrintSingleLine(trsl.DoYouOverwrite.Text);
-			console.PrintC(trsl.Yes.Text, false);
-			console.PrintC(trsl.No.Text, false);
+			console.PrintButtonC(trsl.Yes.Text, 0L, false);
+			console.PrintButtonC(trsl.No.Text, 1L, false);
+			console.NewLine();
 			setWaitInput();
 			state.SystemState = SystemStateCode.SaveGame_WaitInputOverwrite;
 			return;
@@ -1118,11 +1128,10 @@ internal sealed partial class Process
 		console.ReloadErbFinished();
 	}
 
-	private bool writeSavedataTextFrom(int saveIndex)
+	private bool writeSavedataTextFrom(int saveIndex, out string dataMes)
 	{
 		EraDataResult result = vEvaluator.CheckData(saveIndex, EraSaveFileType.Normal);
-		console.Print(result.DataMes);
-		console.NewLine();
+		dataMes = result.DataMes ?? "";
 		return result.State == EraDataState.OK;
 	}
 

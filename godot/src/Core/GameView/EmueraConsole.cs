@@ -162,13 +162,35 @@ internal sealed class EmueraConsole
         }
     }
 
-    public void PrintButton(string display, long input) => _inner.PrintButton(display, input.ToString(), null);
+    public void PrintButton(string display, long input)
+    {
+        var style = ToBridgeStyle();
+        _inner.PrintButton(display, input.ToString(), style);
+        _currentLineIsEmpty = false;
+    }
 
-    public void PrintButton(string display, string input) => _inner.PrintButton(display, input, null);
+    public void PrintButton(string display, string input)
+    {
+        var style = ToBridgeStyle();
+        _inner.PrintButton(display, input, style);
+        _currentLineIsEmpty = false;
+    }
 
-    public void PrintButtonC(string display, long input, bool isRight) => PrintButton(display, input);
+    public void PrintButtonC(string display, long input, bool isRight)
+    {
+        var style = ToBridgeStyle();
+        style.Align = isRight ? 2 : 1;
+        _inner.PrintButton(display, input.ToString(), style);
+        _currentLineIsEmpty = false;
+    }
 
-    public void PrintButtonC(string display, string input, bool isRight) => PrintButton(display, input);
+    public void PrintButtonC(string display, string input, bool isRight)
+    {
+        var style = ToBridgeStyle();
+        style.Align = isRight ? 2 : 1;
+        _inner.PrintButton(display, input, style);
+        _currentLineIsEmpty = false;
+    }
 
     public void PrintTemporaryLine(string str) { Print(str); NewLine(); }
 
@@ -176,7 +198,13 @@ internal sealed class EmueraConsole
 
     public void printCustomBar(string chars, bool isCustomDraw) => _inner.PrintLine(chars ?? Config.DrawLineString);
 
-    public void PrintFlush(bool force = false) { }
+    public void PrintFlush(bool force = false)
+    {
+        // In the original Emuera, PrintFlush renders the current partial line.
+        // In Gemuera we render immediately, so we just ensure the line ends.
+        if (!_currentLineIsEmpty || force)
+            NewLine();
+    }
 
     public void PrintError(string str) => PrintSystemLine(str);
 
