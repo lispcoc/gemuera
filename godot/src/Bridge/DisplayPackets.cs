@@ -29,6 +29,8 @@ public sealed class StringStyle
     public int ForeArgb = -1;
     /// <summary>Background highlight color, packed ARGB. -1 = none.</summary>
     public int BackArgb = -1;
+    /// <summary>Text alignment: 0=left (default), 1=center, 2=right.</summary>
+    public int Align = 0;
 
     public static readonly StringStyle Default = new();
 

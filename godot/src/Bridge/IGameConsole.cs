@@ -77,6 +77,19 @@ public interface IGameConsole
     /// <summary>PLAYSOUND — play a sound effect.</summary>
     void PlaySound(string resourcePath);
 
+    /// <summary>Set BGM volume (0–100).</summary>
+    void SetBgmVolume(int volume);
+
+    /// <summary>Set SE volume (0–100).</summary>
+    void SetSeVolume(int volume);
+
+    // ----------------------------------------------------------------
+    // Mouse
+    // ----------------------------------------------------------------
+
+    /// <summary>Get the current mouse position within the console area.</summary>
+    (int X, int Y) GetMousePosition();
+
     // ----------------------------------------------------------------
     // Input (async — interpreter thread awaits result)
     // ----------------------------------------------------------------

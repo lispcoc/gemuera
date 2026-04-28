@@ -136,12 +136,17 @@ internal sealed partial class Process
 			systemResult = req.DefIntValue;
 			if (flowinputString)
 				exm.VEvaluator.RESULTS = req.DefStrValue;
+			// [Gemuera] Do NOT call WaitInput when force-skipping;
+			// the result is already set and blocking would deadlock.
+			return;
 		}
 		else if (flowinputCanSkip && GlobalStatic.Console.MesSkip)
 		{
 			systemResult = req.DefIntValue;
 			if (flowinputString)
 				exm.VEvaluator.RESULTS = req.DefStrValue;
+			// [Gemuera] Skip user input in message-skip mode.
+			return;
 		}
 		console.WaitInput(req);
 		#endregion

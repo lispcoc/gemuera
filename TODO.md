@@ -74,47 +74,55 @@ d:\Github\gemuera\
 - [x] Godot UIスタブ: `MainNode.cs` (インタープリター起動・管理)
 - [x] Godotシーン: `Main.tscn`, `Console.tscn`
 
+
 ## フェーズ 2 — コンソール表示の実装
 
-- [ ] `ConsoleNode`: `RichTextLabel`によるスタイル付き文字表示
-- [ ] `ConsoleNode`: スクロールバック実装
-- [ ] `ConsoleNode`: `DRAWLINE` (区切り線) 実装
-- [ ] `ConsoleNode`: ボタン文字列クリック (`PRINTBUTTON`) 実装
-- [ ] `ConsoleNode`: `HTML_PRINT` → BBCode変換
-- [ ] `ConsoleNode`: `PRINT_IMG` / 画像表示
-- [ ] CBG (クライアント背景画像) 対応 (`TextureRect`)
-- [ ] フォント設定 (Godot `FontFile` 読み込み)
+- [x] `ConsoleNode`: `RichTextLabel`によるスタイル付き文字表示 (ToBbcode / color / bold / italic / underline / strike)
+- [x] `ConsoleNode`: スクロールバック実装 (ScrollContainer + scroll_following)
+- [x] `ConsoleNode`: `DRAWLINE` (区切り線) 実装 (動的幅対応)
+- [x] `ConsoleNode`: ボタン文字列クリック (`PRINTBUTTON`) 実装 (MetaClicked + URL修正)
+- [x] `ConsoleNode`: `PrintC`/`PrintCR` 中央/右揃え BBCode対応
+- [x] `ConsoleNode`: `HTML_PRINT` → BBCode変換 (基本タグ)
+- [x] `ConsoleNode`: `PRINT_IMG` / 画像表示 (BBCode [img]タグ + 幅・高さ・揃え対応)
+- [x] `EmueraConsole`: LineCount / LastLineIsEmpty / IsTimeOut 追跡実装
+- [x] CBG (クライアント背景画像) 対応 (`TextureRect` + `CbgContainer`)
+- [ ] フォント設定 (Godot `FontFile` 読み込み / CJKフォント同梱)
 - [ ] 文字幅計算の実装 (`Font.get_string_size()`)
 
 ## フェーズ 3 — 入力処理の実装
 
-- [ ] テキスト入力 (`INPUT`/`INPUTS`) — `LineEdit`
-- [ ] `WAIT`/`WAITANYKEY` — キー/クリック待ち
-- [ ] `ONEINPUT` — 1文字入力
-- [ ] タイムアウト付き入力 (`TINPUT`)
-- [ ] ボタン番号選択 (`INPUT` with button display)
+- [x] テキスト入力 (`INPUT`/`INPUTS`) — `LineEdit`
+- [x] `WAIT`/`WAITANYKEY` — Enter/クリック待ち (InputType.EnterKey / AnyKey)
+- [x] `ONEINPUT` — 1文字入力 (OneInput フラグ対応)
+- [x] タイムアウト付き入力 (`TINPUT`/`TINPUTS`) (Timelimit / IsTimeOut / IsTimeout)
+- [x] ボタン番号選択 (`INPUT` with button display) (OnMetaClicked)
 - [ ] マウス入力 (`MOUSE_*`) 対応
 - [ ] ファンクションキー・マクロ機能
 
 ## フェーズ 4 — ファイルI/O・セーブロード
 
-- [ ] `emuera.config` 読み込み (Android: `user://`, Web: JS localStorage)
-- [ ] CSV / ERB / ERH ファイルアクセス
-  - Desktop: 通常ファイルシステム  
-  - Android/Web: `res://` (Godotリソース) または `user://`
-- [ ] セーブデータの読み書き (バイナリ)
+- [x] Android/Web: セーブデータディレクトリを `user://sav` にリダイレクト (`Program.SetSavDir`)
+- [x] Android/Web: ERB/CSV ファイルを Godot `DirAccess`/`FileAccess` 経由でプリロード (`PreloadGodotDir`)
+- [ ] `emuera.config` 読み込み (Android/Web: `user://` 対応)
+- [ ] セーブデータの読み書き (バイナリ) — 動作確認
 - [ ] _Replace.csv / _Rename.csv 適用
 
 ## フェーズ 5 — サウンド
 
-- [ ] BGM再生 (mp3/ogg) — `AudioStreamPlayer` + `AudioStreamOggVorbis`
-- [ ] SE (効果音) 再生
-- [ ] ループ再生 / フェード対応
-- [ ] WMPLib・NAudio依存の完全除去
+- [x] BGM再生 (ogg/mp3) — `AudioStreamPlayer` + `AudioStreamOggVorbis`/`AudioStreamMP3` (ループ対応)
+- [x] SE (効果音) 再生 — `AudioStreamPlayer`
+- [x] WAV再生対応 (`AudioStreamWav`)
+- [ ] フェード対応
+- [x] WMPLib・NAudio依存の完全除去 (`SoundManager` → `IGameConsole` 経由)
+- [x] BGM/SE ボリューム制御 (`SetBgmVolume`/`SetSeVolume` → `AudioStreamPlayer.VolumeDb`)
+- [ ] フェード対応
 
 ## フェーズ 6 — 画像・WebP対応
 
-- [ ] 標準画像 (png/jpg/bmp) → `Image.load_from_file()`
+- [x] 標準画像 (png/jpg/bmp/webp) — `Image.Load()` + `ImageTexture` (`LoadTexture` ヘルパー)
+- [x] CBG背景画像表示 (`TextureRect` + `CbgSet`/`CbgClear`)
+- [ ] `AppContents` の画像キャッシュをGodot版に移植
+- [ ] アニメーションスプライト対応
 - [ ] WebP → Godot組込みデコーダー (Godot 4はWebP対応)
 - [ ] `AppContents` の画像キャッシュをGodot版に移植
 - [ ] アニメーションスプライト対応

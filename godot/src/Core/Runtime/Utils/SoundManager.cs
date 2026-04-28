@@ -31,4 +31,14 @@ internal static class SoundManager
     }
 
     public static void Dispose() { }
+
+    public static void SetBgmVolume(int volume)
+    {
+        _console?.SetBgmVolume(volume);
+    }
+
+    public static void SetSeVolume(int volume)
+    {
+        _console?.SetSeVolume(volume);
+    }
 }

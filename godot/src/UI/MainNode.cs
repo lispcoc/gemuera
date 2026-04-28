@@ -5,8 +5,10 @@ using Gemuera.Bridge;
 using MinorShift.Emuera;
 using MinorShift.Emuera.GameView;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using GodotFileAccess = Godot.FileAccess;
 
 namespace Gemuera.UI;
 
@@ -88,6 +90,19 @@ public partial class MainNode : Node
 
             // 1. Initialise static path/encoding settings
             Program.SetPaths(gameRoot, DebugMode);
+
+            // On Android and Web, save data must go to user:// (writable user data dir).
+            // Override SavDir to a platform-appropriate writable location.
+            string featureName = OS.GetName().ToLowerInvariant();
+            bool isAndroid = featureName == "android";
+            bool isWeb     = featureName == "web" || featureName == "html5";
+            if (isAndroid || isWeb)
+            {
+                string savDir = ProjectSettings.GlobalizePath("user://sav") + Path.DirectorySeparatorChar;
+                Directory.CreateDirectory(savDir);
+                Program.SetSavDir(savDir);
+                GemueraLogger.Log($"Platform={featureName}: SavDir redirected to user://sav -> {savDir}");
+            }
             GemueraLogger.Log($"Paths set. ExeDir={Program.ExeDir}  ErbDir={Program.ErbDir}");
 
             // 2. Load config
@@ -101,8 +116,8 @@ public partial class MainNode : Node
             // 3. Preload all ERB/CSV files into memory cache (mirrors EmueraConsole.StartConsole)
             GemueraLogger.Log("Preloading files...");
             MinorShift.Emuera.Runtime.Utils.Preload.Clear();
-            await MinorShift.Emuera.Runtime.Utils.Preload.Load(Program.ErbDir);
-            await MinorShift.Emuera.Runtime.Utils.Preload.Load(Program.CsvDir);
+            await PreloadGodotDir(Program.ErbDir);
+            await PreloadGodotDir(Program.CsvDir);
             GemueraLogger.Log("Preload done.");
 
             // 4. Create and initialise the interpreter (EmueraConsole is created inside Process)
@@ -173,5 +188,65 @@ public partial class MainNode : Node
             try { _process.RequestQuit(); }
             catch (Exception ex) { GemueraLogger.LogException("RequestQuit", ex); }
         }
+    }
+
+    /// <summary>
+    /// Load all ERA script/data files from a Godot directory path (res:// or user://).
+    /// Uses Godot's DirAccess so it works on Android and Web where System.IO doesn't.
+    /// Falls back to System.IO for regular filesystem paths.
+    /// </summary>
+    private static async Task PreloadGodotDir(string dirPath)
+    {
+        if (string.IsNullOrEmpty(dirPath)) return;
+
+        // For regular file system paths, let Preload handle it normally
+        if (!dirPath.StartsWith("res://") && !dirPath.StartsWith("user://"))
+        {
+            await MinorShift.Emuera.Runtime.Utils.Preload.Load(dirPath);
+            return;
+        }
+
+        // Walk the directory recursively using Godot's DirAccess
+        var toVisit = new Queue<string>();
+        toVisit.Enqueue(dirPath.TrimEnd('/', '\\'));
+
+        var gameFiles = new List<string>();
+        var validExts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { ".csv", ".erb", ".erh", ".erd", ".als" };
+
+        while (toVisit.Count > 0)
+        {
+            string current = toVisit.Dequeue();
+            using var da = DirAccess.Open(current);
+            if (da == null) continue;
+            da.ListDirBegin();
+            string entry;
+            while ((entry = da.GetNext()) != "")
+            {
+                if (entry == "." || entry == "..") continue;
+                string fullPath = current + "/" + entry;
+                if (da.CurrentIsDir())
+                    toVisit.Enqueue(fullPath);
+                else if (validExts.Contains(Path.GetExtension(entry)))
+                    gameFiles.Add(fullPath);
+            }
+            da.ListDirEnd();
+        }
+
+        // Load each file into the Preload cache
+        await Task.Run(() =>
+        {
+            foreach (string filePath in gameFiles)
+            {
+                using var fa = GodotFileAccess.Open(filePath, GodotFileAccess.ModeFlags.Read);
+                if (fa == null) continue;
+                string text = fa.GetAsText();
+                string[] lines = text.Split('\n');
+                // Strip trailing \r from each line (Windows line endings)
+                for (int i = 0; i < lines.Length; i++)
+                    lines[i] = lines[i].TrimEnd('\r');
+                MinorShift.Emuera.Runtime.Utils.Preload.AddToCache(filePath, lines);
+            }
+        });
     }
 }

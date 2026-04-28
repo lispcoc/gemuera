@@ -72,6 +72,12 @@ internal sealed class EmueraConsole
     private readonly List<ConsoleDisplayLine> _displayLineList = [];
     private readonly ConsoleWindow _window = new();
 
+    // Line state tracking for EmptyLine / LastLineIsEmpty / LineCount
+    private long _lineCount = 0;
+    private bool _currentLineIsEmpty = true;
+    private bool _lastLineIsEmpty = true;
+    private bool _lastInputWasTimeout = false;
+
     public EmueraConsole(IGameConsole inner)
     {
         _inner = inner;
@@ -90,12 +96,12 @@ internal sealed class EmueraConsole
     public bool IsRunning => _inner.IsRunning;
     public bool Enabled => true;
     public bool RunERBFromMemory => false;
-    public bool EmptyLine => false;
-    public bool LastLineIsEmpty => false;
+    public bool EmptyLine => _currentLineIsEmpty;
+    public bool LastLineIsEmpty => _lastLineIsEmpty;
     public bool LastLineIsTemporary => false;
     public long LastButtonGeneration => 0;
     public bool bitmapCacheEnabledForNextLine { get; set; }
-    public int GetLineNo => _displayLineList.Count;
+    public int GetLineNo => (int)_lineCount;
     public bool noOutputLog { get; set; }
     public bool updatedGeneration { get; set; }
     public bool AlwaysRefresh { get; set; }
@@ -123,7 +129,14 @@ internal sealed class EmueraConsole
 
     // ---- Print methods ----
 
-    public void Print(string str) => _inner.PrintString(str, ToBridgeStyle());
+    public void Print(string str)
+    {
+        if (!string.IsNullOrEmpty(str))
+        {
+            _inner.PrintString(str, ToBridgeStyle());
+            _currentLineIsEmpty = false;
+        }
+    }
 
     public void Print(string str, bool lineEnd) { Print(str); if (lineEnd) NewLine(); }
 
@@ -138,7 +151,16 @@ internal sealed class EmueraConsole
 
     public void PrintPlain(string str) => Print(str);
 
-    public void PrintC(string str, bool isRight) => Print(str);
+    public void PrintC(string str, bool isRight)
+    {
+        if (!string.IsNullOrEmpty(str))
+        {
+            var style = ToBridgeStyle();
+            style.Align = isRight ? 2 : 1; // 1=center, 2=right
+            _inner.PrintString(str, style);
+            _currentLineIsEmpty = false;
+        }
+    }
 
     public void PrintButton(string display, long input) => _inner.PrintButton(display, input.ToString(), null);
 
@@ -185,9 +207,19 @@ internal sealed class EmueraConsole
 
     // ---- Newline / line delete ----
 
-    public void NewLine() => _inner.PrintNewLine();
+    public void NewLine()
+    {
+        _inner.PrintNewLine();
+        _lastLineIsEmpty = _currentLineIsEmpty;
+        _currentLineIsEmpty = true;
+        _lineCount++;
+    }
 
-    public void deleteLine(int count) => _inner.ClearLine(count);
+    public void deleteLine(int count)
+    {
+        _inner.ClearLine(count);
+        _lineCount = System.Math.Max(0, _lineCount - count);
+    }
 
     public void RefreshStrings(bool force) { }
 
@@ -225,17 +257,92 @@ internal sealed class EmueraConsole
 
     // ---- Input ----
 
-    public void WaitInput(InputRequest req) => _inner.RequestInputAsync(req).GetAwaiter().GetResult();
+    public void WaitInput(InputRequest req)
+    {
+        var result = _inner.RequestInputAsync(req).GetAwaiter().GetResult();
+        if (result == null) return;
+        _lastInputWasTimeout = result.IsTimeout;
+        ApplyInputResult(req, result);
+    }
+
+    /// <summary>
+    /// After the UI returns an InputResult, write it into the appropriate ERA variables.
+    /// For IsSystemInput requests, also forwards the value to Process.InputSystemInteger
+    /// so that systemResult (used by the system state machine) is updated.
+    /// </summary>
+    private static void ApplyInputResult(InputRequest req, Gemuera.Bridge.InputResult result)
+    {
+        var vev = GlobalStatic.VEvaluator;
+        if (vev == null) return;
+
+        // Determine the raw string: timeout uses default, otherwise the typed/clicked value.
+        string raw = result.IsTimeout
+            ? (req.InputType == InputType.StrValue ? (req.DefStrValue ?? "") : req.DefIntValue.ToString())
+            : (result.Value ?? "");
+
+        switch (req.InputType)
+        {
+            case InputType.StrValue:
+            case InputType.StrButton:
+                vev.RESULTS = raw;
+                break;
+
+            case InputType.IntValue:
+            case InputType.IntButton:
+            case InputType.AnyKey:
+            case InputType.EnterKey:
+            {
+                long val = 0;
+                long.TryParse(raw, out val);
+                if (req.MouseInput)
+                {
+                    // Mouse/button index stored in RESULT:1
+                    vev.RESULT_ARRAY[1] = val;
+                }
+                else
+                {
+                    vev.RESULT = val;
+                }
+                if (req.IsSystemInput)
+                    GlobalStatic.Process?.InputSystemInteger(val);
+                break;
+            }
+
+            case InputType.AnyValue:
+                if (long.TryParse(raw, out long ival))
+                {
+                    vev.RESULT = ival;
+                    if (req.IsSystemInput)
+                        GlobalStatic.Process?.InputSystemInteger(ival);
+                }
+                else
+                {
+                    vev.RESULTS = raw;
+                }
+                break;
+
+            // Void: no variable to update
+        }
+    }
 
     public void ReadAnyKey(bool canSkip = false, bool isEnterOnly = false)
     {
-        var req = new InputRequest();
+        var req = new InputRequest
+        {
+            InputType = isEnterOnly ? InputType.EnterKey : InputType.AnyKey
+        };
         WaitInput(req);
     }
 
     // ---- State ----
 
-    public void ClearText() => _inner.ClearScreen();
+    public void ClearText()
+    {
+        _inner.ClearScreen();
+        _lineCount = 0;
+        _currentLineIsEmpty = true;
+        _lastLineIsEmpty = true;
+    }
 
     public void Quit() => _inner.Quit();
 
@@ -253,9 +360,9 @@ internal sealed class EmueraConsole
 
     public string GetWindowTitle() => _inner.GetWindowTitle();
 
-    public long LineCount => 0;
+    public long LineCount => _lineCount;
 
-    public bool IsTimeOut => false;
+    public bool IsTimeOut => _lastInputWasTimeout;
 
     public string getDefStBar() => string.Empty;
 
@@ -275,7 +382,11 @@ internal sealed class EmueraConsole
 
     public void SetRedraw(long val) { _redraw = val != 0 ? ConsoleRedraw.Normal : ConsoleRedraw.None; }
 
-    public Point GetMousePosition() => Point.Empty;
+    public Point GetMousePosition()
+    {
+        var pos = _inner.GetMousePosition();
+        return new Point(pos.X, pos.Y);
+    }
 
     public void MoveMouse(Point p) { }
 

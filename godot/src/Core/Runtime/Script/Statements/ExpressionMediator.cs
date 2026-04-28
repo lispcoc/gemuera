@@ -1,5 +1,4 @@
-﻿using Microsoft.VisualBasic;
-using MinorShift.Emuera.GameProc;
+﻿using MinorShift.Emuera.GameProc;
 using MinorShift.Emuera.GameProc.Function;
 using MinorShift.Emuera.GameView;
 using MinorShift.Emuera.Runtime.Script.Statements.Variable;
@@ -65,14 +64,13 @@ internal sealed class ExpressionMediator
 	{
 		if (!(forceHiragana | forceKatakana | halftoFull))
 			return str;
+		// [Gemuera] Cross-platform replacements for StrConv
 		if (forceKatakana)
-			return Strings.StrConv(str, VbStrConv.Katakana, 0x0411);
+			return JapaneseCharConverter.HiraganaToKatakana(str);
 		else if (forceHiragana)
 		{
-			if (halftoFull)
-				return Strings.StrConv(str, VbStrConv.Hiragana | VbStrConv.Wide, 0x0411);
-			else
-				return Strings.StrConv(str, VbStrConv.Hiragana, 0x0411);
+			string hiragana = JapaneseCharConverter.KatakanaToHiragana(str);
+			return halftoFull ? JapaneseCharConverter.ToFullWidth(hiragana) : hiragana;
 		}
 		return str;
 	}

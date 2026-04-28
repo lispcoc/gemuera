@@ -14,6 +14,18 @@ ScrollContainerPath = NodePath("VBox/Scroll")
 RichTextLabelPath = NodePath("VBox/Scroll/RichText")
 InputLinePath = NodePath("VBox/InputLine")
 StatusLabelPath = NodePath("VBox/StatusBar")
+BgmPlayerPath = NodePath("BgmPlayer")
+SePlayerPath = NodePath("SePlayer")
+CbgContainerPath = NodePath("CbgContainer")
+
+[node name="CbgContainer" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [node name="VBox" type="VBoxContainer" parent="."]
 layout_mode = 1
@@ -51,3 +63,7 @@ layout_mode = 2
 text = "Gemuera"
 theme_override_font_sizes/font_size = 12
 theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
+
+[node name="BgmPlayer" type="AudioStreamPlayer" parent="."]
+
+[node name="SePlayer" type="AudioStreamPlayer" parent="."]

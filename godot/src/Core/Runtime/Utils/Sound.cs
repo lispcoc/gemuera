@@ -29,5 +29,11 @@ internal class Sound
 
     public bool isPlaying() => false; // stub
 
-    public void setVolume(int vol) { } // stub
+    public void setVolume(int vol)
+    {
+        if (_repeat == -1)
+            SoundManager.SetBgmVolume(vol);
+        else
+            SoundManager.SetSeVolume(vol);
+    }
 }

@@ -16,6 +16,18 @@ static partial class Preload
 		return files[path];
 	}
 
+	/// <summary>
+	/// Manually insert a file into the cache. Used by the Godot UI layer
+	/// (MainNode) when loading from res:// or user:// paths on Android/Web.
+	/// </summary>
+	public static void AddToCache(string path, string[] lines)
+	{
+		lock (files)
+		{
+			files[path] = lines;
+		}
+	}
+
 	// Opens as UTF8BOM if starts with BOM, else use DetectEncoding
 	private static string[] readAllLinesDetectEncoding(string path)
 	{

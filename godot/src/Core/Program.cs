@@ -43,6 +43,12 @@ internal static class Program
     /// <summary>Files to analyse in AnalysisMode (null outside analysis mode).</summary>
     public static System.Collections.Generic.List<string> AnalysisFiles;
 
+    /// <summary>Override the save directory (used on Android/Web for user://).</summary>
+    public static void SetSavDir(string savDir)
+    {
+        SavDir = savDir;
+    }
+
     /// <summary>
     /// Must be called by the Godot UI layer before creating Process.
     /// </summary>
