@@ -1,0 +1,71 @@
+# ===========================
+# Godot 4
+# ===========================
+
+# Godot project cache (generated files)
+godot/.godot/
+
+# Godot export outputs
+godot/export/
+*.pck
+*.apk
+*.aab
+*.ipa
+*.exe
+*.x86_64
+*.arm64
+godot/.mono/
+
+# Godot C# generated
+godot/.generated/
+
+# ===========================
+# .NET / C#
+# ===========================
+
+godot/bin/
+godot/obj/
+*.user
+*.suo
+*.csproj.user
+.packages/
+
+# ===========================
+# IDE
+# ===========================
+
+.vs/
+.vscode/
+.idea/
+*.sln.DotSettings.user
+
+# ===========================
+# Tools / Binaries
+# ===========================
+
+# Godot engine binary (large, download separately)
+tools/godot/
+
+# ===========================
+# OS
+# ===========================
+
+Thumbs.db
+Desktop.ini
+.DS_Store
+ehthumbs.db
+
+# ===========================
+# Patch / Diff
+# ===========================
+
+*.diff
+*.patch
+
+# ===========================
+# ERA game data (optional: uncomment if game files should not be committed)
+# ===========================
+
+# godot/game/
+# godot/ERB/
+# godot/CSV/
