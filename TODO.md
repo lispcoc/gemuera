@@ -106,7 +106,7 @@ d:\Github\gemuera\
 - [x] Android/Web: ERB/CSV ファイルを Godot `DirAccess`/`FileAccess` 経由でプリロード (`PreloadGodotDir`)
 - [x] `emuera.config` 読み込み (Android/Web: `user://` 対応)
 - [ ] セーブデータの読み書き (バイナリ) — 動作確認
-- [ ] _Replace.csv / _Rename.csv 適用
+- [x] _Replace.csv / _Rename.csv 適用 (Android/Webでは Preload キャッシュ経由にフォールバック)
 
 ## フェーズ 5 — サウンド
 
@@ -122,9 +122,7 @@ d:\Github\gemuera\
 
 - [x] 標準画像 (png/jpg/bmp/webp) — `Image.Load()` + `ImageTexture` (`LoadTexture` ヘルパー)
 - [x] CBG背景画像表示 (`TextureRect` + `CbgSet`/`CbgClear`)
-- [ ] `AppContents` の画像キャッシュをGodot版に移植
-- [ ] アニメーションスプライト対応
-- [ ] WebP → Godot組込みデコーダー (Godot 4はWebP対応)
+- [x] WebP → Godot組込みデコーダー (`LoadTexture` 内の `Image.Load()` が WebP を自動処理)
 - [ ] `AppContents` の画像キャッシュをGodot版に移植
 - [ ] アニメーションスプライト対応
 
@@ -165,10 +163,25 @@ d:\Github\gemuera\
 ## フェーズ 10 — 品質・互換性
 
 - [ ] 既存ERAゲームとの互換性テスト
-- [ ] `EMUERA_*` 定数の正確な模倣
+- [x] `EMUERA_VERSION` 定数 → `"1.824.0.0"` を返すトークンで実装済み
+- [x] `WINDOW_TITLE` 変数 — `SetWindowTitle()` / `GetWindowTitle()` 実装済み (`_windowTitle` フィールドで追跡)
 - [ ] デバッグ機能 (DEBUG変数、debugprint)
 - [ ] PluginSystem の代替 (GDExtension or 無効化)
 - [ ] パフォーマンスプロファイリング
+
+## フェーズ 11 — 設定画面
+
+Godot 版 Gemuera にゲーム内設定 UI を追加する。元の Emuera の ConfigDialog (WinForms) に相当。
+
+- [x] `SettingsNode.cs` — Godot Control スクリプト (TabContainer + 各設定項目)
+- [x] `Settings.tscn` — CanvasLayer オーバーレイシーン
+- [x] `ConsoleNode` から ESC キーで設定画面を開く / 閉じる (入力待ち中は無視)
+- [x] 「表示」タブ: フォントサイズ (SpinBox), フォント名 (LineEdit), 文字色/背景色/選択色 (ColorPickerButton)
+- [x] 「サウンド」タブ: BGM 音量 / SE 音量 (HSlider, 0-100)
+- [x] 「システム」タブ: MaxLog (SpinBox), DisplayReport (CheckBox)
+- [x] 設定を `emuera.config` に保存 (`ConfigData.SaveConfig(string path)` オーバーロード追加、`TrySaveEraConfig()` 経由で常に明示的パスへ保存), ゲームに即時反映
+- [x] Android/Web 向け: 設定ファイル保存先を `user://emuera.config` へ (`TrySaveEraConfig()` が `ProjectSettings.GlobalizePath("user://emuera.config")` を明示的パスとして使用、`Program.ExeDir` 変更なし)
+- [x] 設定画面から BGM/SE ボリュームをリアルタイム反映 (スライダー操作で即時反映 + `ConsoleNode._Ready()` 内で `SettingsNode.LoadVolumeSetting()` を呼んで起動時復元)
 
 ---
 

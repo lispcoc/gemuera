@@ -28,6 +28,19 @@ static partial class Preload
 		}
 	}
 
+	/// <summary>
+	/// Returns true if the given path is present in the preload cache.
+	/// Used to check for _Replace.csv / _Rename.csv on Android/Web where
+	/// System.IO.File.Exists() cannot resolve res:// or user:// paths.
+	/// </summary>
+	public static bool ContainsFile(string path)
+	{
+		lock (files)
+		{
+			return files.ContainsKey(path);
+		}
+	}
+
 	// Opens as UTF8BOM if starts with BOM, else use DetectEncoding
 	private static string[] readAllLinesDetectEncoding(string path)
 	{

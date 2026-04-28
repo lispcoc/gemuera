@@ -605,7 +605,10 @@ internal sealed class ConfigData
 	#endregion
 
 
-	public bool SaveConfig()
+	public bool SaveConfig() => SaveConfig(configPath);
+
+	/// <summary>Save config to an explicit path (e.g. user:// on Android/Web).</summary>
+	public bool SaveConfig(string targetPath)
 	{
 		StreamWriter writer = null;
 
@@ -613,7 +616,7 @@ internal sealed class ConfigData
 		{
 			#region EM_私家版_Emuera多言語化改造
 			// writer = new StreamWriter(configPath, false, Config.Encode);
-			writer = new StreamWriter(configPath, false, Config.Encode);
+			writer = new StreamWriter(targetPath, false, Config.Encode);
 
 			// for (int i = 0; i < configArray.Length; i++)
 			for (int i = 0; i < configArray.Count; i++)

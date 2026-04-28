@@ -33,6 +33,7 @@ public partial class ConsoleNode : Control, IGameConsole
     [Export] public NodePath BgmPlayerPath        = "BgmPlayer";
     [Export] public NodePath SePlayerPath         = "SePlayer";
     [Export] public NodePath CbgContainerPath     = "CbgContainer";
+    [Export] public NodePath SettingsPath         = "Settings";
 
     // ----------------------------------------------------------------
     // Runtime fields
@@ -134,6 +135,20 @@ public partial class ConsoleNode : Control, IGameConsole
         _sePlayer  = GetNode<AudioStreamPlayer>(SePlayerPath);
         _bgmPlayer.Finished += () => { /* loop BGM */ if (_bgmPlayer.Stream != null) _bgmPlayer.Play(); };
         _cbgContainer = GetNode<Control>(CbgContainerPath);
+
+        // Wire settings overlay
+        if (!SettingsPath.IsEmpty)
+        {
+            var settingsNode = GetNodeOrNull<SettingsNode>(SettingsPath);
+            if (settingsNode != null)
+                SetSettingsNode(settingsNode);
+        }
+
+        // Restore persisted BGM/SE volumes from gemuera_settings.cfg
+        int savedBgm = SettingsNode.LoadVolumeSetting("bgm_volume", 80);
+        int savedSe  = SettingsNode.LoadVolumeSetting("se_volume",  80);
+        SetUserBgmVolume(savedBgm);
+        SetUserSeVolume(savedSe);
     }
 
     // Drain the UI action queue every frame
@@ -402,9 +417,19 @@ public partial class ConsoleNode : Control, IGameConsole
             var tcs = _inputTcs;
             bool hasPending = req != null && tcs != null && !tcs.Task.IsCompleted;
 
-            // ── Escape: advance WAIT / AnyKey (same as B button) ────────────────
-            if (key.Keycode == Key.Escape && hasPending)
+            // ── Escape: open settings overlay when idle, advance WAIT when pending ─
+            if (key.Keycode == Key.Escape)
             {
+                if (!hasPending)
+                {
+                    // No input is pending — open/close the settings screen
+                    if (_settings != null && !_settings.Visible)
+                    {
+                        GetViewport().SetInputAsHandled();
+                        ShowSettings();
+                    }
+                    return;
+                }
                 if (req.InputType == InputType.AnyKey || req.InputType == InputType.EnterKey)
                 {
                     GetViewport().SetInputAsHandled();
@@ -665,6 +690,44 @@ public partial class ConsoleNode : Control, IGameConsole
         Enqueue(() => _sePlayer.VolumeDb = Mathf.LinearToDb(Mathf.Clamp(volume / 100f, 0f, 1f)));
     }
 
+    // ---- User-controlled volume (persisted via SettingsNode / gemuera_settings.cfg) ----
+
+    /// <summary>Apply a user-specified BGM volume override (0–100).</summary>
+    public void SetUserBgmVolume(int volume)
+    {
+        Enqueue(() => _bgmPlayer.VolumeDb = Mathf.LinearToDb(Mathf.Clamp(volume / 100f, 0f, 1f)));
+    }
+
+    /// <summary>Apply a user-specified SE volume override (0–100).</summary>
+    public void SetUserSeVolume(int volume)
+    {
+        Enqueue(() => _sePlayer.VolumeDb = Mathf.LinearToDb(Mathf.Clamp(volume / 100f, 0f, 1f)));
+    }
+
+    // ---- Settings screen ----
+
+    private SettingsNode _settings;
+
+    /// <summary>Attach the SettingsNode child (called from _Ready or wired in the scene).</summary>
+    public void SetSettingsNode(SettingsNode settings)
+    {
+        _settings = settings;
+        _settings.SettingsClosed += OnSettingsClosed;
+    }
+
+    /// <summary>Open the settings overlay (called on ESC when no input is pending).</summary>
+    public void ShowSettings()
+    {
+        if (_settings == null) return;
+        _settings.ShowSettings(this);
+    }
+
+    private void OnSettingsClosed()
+    {
+        // Re-apply font settings now that config was updated
+        ApplyConfigFont();
+    }
+
     /// <summary>
     /// Load an audio stream from either a Godot resource path (res://) or
     /// an absolute/relative file system path (for user-supplied game data).
@@ -907,10 +970,12 @@ public partial class ConsoleNode : Control, IGameConsole
 
     public void SetWindowTitle(string title)
     {
+        _windowTitle = title;
         Enqueue(() => DisplayServer.WindowSetTitle(title));
     }
 
-    public string GetWindowTitle() => Engine.GetVersionInfo().ToString();
+    private string _windowTitle = "Gemuera";
+    public string GetWindowTitle() => _windowTitle;
 
     public void SetStatusBar(string text)
     {

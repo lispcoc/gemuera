@@ -41,14 +41,22 @@ internal partial class ParserMediator
 	//1756 Process.Load.csより移動
 	public static void LoadEraExRenameFile(string filepath)
 	{
-		if (!File.Exists(filepath))
+		// Check Preload cache first (needed for Android/Web where File.Exists fails on res:// paths)
+		string[] fileLine;
+		if (Preload.ContainsFile(filepath))
+		{
+			fileLine = Preload.GetFileLines(filepath);
+		}
+		else if (File.Exists(filepath))
+		{
+			fileLine = File.ReadAllLines(filepath, EncodingHandler.DetectEncoding(filepath));
+		}
+		else
 		{
 			return;
 		}
 		if (RenameDic.Count > 0)
 			RenameDic.Clear();
-
-		var fileLine = File.ReadAllLines(filepath, EncodingHandler.DetectEncoding(filepath));
 		ScriptPosition? pos = null;
 		Regex regex = unEscapedCommaRegex();
 		try

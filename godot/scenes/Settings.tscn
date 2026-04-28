@@ -1,0 +1,217 @@
+[gd_scene load_steps=2 format=3 uid="uid://settings_scene"]
+
+[ext_resource type="Script" path="res://src/UI/SettingsNode.cs" id="1_settings"]
+
+; ----------------------------------------------------------------
+; Root: CanvasLayer so it overlays the game at all times
+; ----------------------------------------------------------------
+[node name="Settings" type="CanvasLayer"]
+layer = 10
+script = ExtResource("1_settings")
+
+; ----------------------------------------------------------------
+; Semi-transparent background panel fills the whole viewport
+; ----------------------------------------------------------------
+[node name="BgRect" type="ColorRect" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.7)
+mouse_filter = 0
+
+; ----------------------------------------------------------------
+; Centred panel
+; ----------------------------------------------------------------
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 3
+anchor_left = 0.1
+anchor_top = 0.05
+anchor_right = 0.9
+anchor_bottom = 0.95
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 8
+offset_left = 12
+offset_top = 8
+offset_right = -12
+offset_bottom = -8
+
+[node name="Title" type="Label" parent="Panel/VBox"]
+layout_mode = 2
+text = "設定 / Settings"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 20
+
+; ----------------------------------------------------------------
+; TabContainer with 3 tabs: Display / Sound / System
+; ----------------------------------------------------------------
+[node name="Tabs" type="TabContainer" parent="Panel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/font_size = 14
+
+; ---- Tab 0: 表示 / Display ----
+[node name="表示 / Display" type="VBoxContainer" parent="Panel/VBox/Tabs"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="FontSizeRow" type="HBoxContainer" parent="Panel/VBox/Tabs/表示 / Display"]
+layout_mode = 2
+
+[node name="FontSizeLbl" type="Label" parent="Panel/VBox/Tabs/表示 / Display/FontSizeRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "フォントサイズ / Font size"
+
+[node name="FontSizeSpin" type="SpinBox" parent="Panel/VBox/Tabs/表示 / Display/FontSizeRow"]
+layout_mode = 2
+min_value = 8
+max_value = 48
+value = 18
+
+[node name="FontNameRow" type="HBoxContainer" parent="Panel/VBox/Tabs/表示 / Display"]
+layout_mode = 2
+
+[node name="FontNameLbl" type="Label" parent="Panel/VBox/Tabs/表示 / Display/FontNameRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "フォント名 / Font name"
+
+[node name="FontNameEdit" type="LineEdit" parent="Panel/VBox/Tabs/表示 / Display/FontNameRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "MS Gothic"
+
+[node name="ForeColorRow" type="HBoxContainer" parent="Panel/VBox/Tabs/表示 / Display"]
+layout_mode = 2
+
+[node name="ForeColorLbl" type="Label" parent="Panel/VBox/Tabs/表示 / Display/ForeColorRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "文字色 / Text color"
+
+[node name="ForeColorBtn" type="ColorPickerButton" parent="Panel/VBox/Tabs/表示 / Display/ForeColorRow"]
+layout_mode = 2
+color = Color(0.753, 0.753, 0.753, 1)
+
+[node name="BackColorRow" type="HBoxContainer" parent="Panel/VBox/Tabs/表示 / Display"]
+layout_mode = 2
+
+[node name="BackColorLbl" type="Label" parent="Panel/VBox/Tabs/表示 / Display/BackColorRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "背景色 / Background color"
+
+[node name="BackColorBtn" type="ColorPickerButton" parent="Panel/VBox/Tabs/表示 / Display/BackColorRow"]
+layout_mode = 2
+color = Color(0, 0, 0, 1)
+
+[node name="FocusColorRow" type="HBoxContainer" parent="Panel/VBox/Tabs/表示 / Display"]
+layout_mode = 2
+
+[node name="FocusColorLbl" type="Label" parent="Panel/VBox/Tabs/表示 / Display/FocusColorRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "選択色 / Focus color"
+
+[node name="FocusColorBtn" type="ColorPickerButton" parent="Panel/VBox/Tabs/表示 / Display/FocusColorRow"]
+layout_mode = 2
+color = Color(1, 1, 0, 1)
+
+; ---- Tab 1: サウンド / Sound ----
+[node name="サウンド / Sound" type="VBoxContainer" parent="Panel/VBox/Tabs"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="BgmRow" type="HBoxContainer" parent="Panel/VBox/Tabs/サウンド / Sound"]
+layout_mode = 2
+
+[node name="BgmLbl" type="Label" parent="Panel/VBox/Tabs/サウンド / Sound/BgmRow"]
+layout_mode = 2
+size_flags_horizontal = 0
+custom_minimum_size = Vector2(200, 0)
+text = "BGM音量 / BGM Volume"
+
+[node name="BgmSlider" type="HSlider" parent="Panel/VBox/Tabs/サウンド / Sound/BgmRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 100.0
+value = 80.0
+step = 1.0
+
+[node name="BgmVal" type="Label" parent="Panel/VBox/Tabs/サウンド / Sound/BgmRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(36, 0)
+horizontal_alignment = 2
+text = "80"
+
+[node name="SeRow" type="HBoxContainer" parent="Panel/VBox/Tabs/サウンド / Sound"]
+layout_mode = 2
+
+[node name="SeLbl" type="Label" parent="Panel/VBox/Tabs/サウンド / Sound/SeRow"]
+layout_mode = 2
+size_flags_horizontal = 0
+custom_minimum_size = Vector2(200, 0)
+text = "SE音量 / SE Volume"
+
+[node name="SeSlider" type="HSlider" parent="Panel/VBox/Tabs/サウンド / Sound/SeRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 100.0
+value = 80.0
+step = 1.0
+
+[node name="SeVal" type="Label" parent="Panel/VBox/Tabs/サウンド / Sound/SeRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(36, 0)
+horizontal_alignment = 2
+text = "80"
+
+; ---- Tab 2: システム / System ----
+[node name="システム / System" type="VBoxContainer" parent="Panel/VBox/Tabs"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="MaxLogRow" type="HBoxContainer" parent="Panel/VBox/Tabs/システム / System"]
+layout_mode = 2
+
+[node name="MaxLogLbl" type="Label" parent="Panel/VBox/Tabs/システム / System/MaxLogRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "最大ログ行数 / Max log lines"
+
+[node name="MaxLogSpin" type="SpinBox" parent="Panel/VBox/Tabs/システム / System/MaxLogRow"]
+layout_mode = 2
+min_value = 1000
+max_value = 100000
+step = 1000
+value = 5000
+
+[node name="DisplayReportRow" type="HBoxContainer" parent="Panel/VBox/Tabs/システム / System"]
+layout_mode = 2
+
+[node name="DisplayReportLbl" type="Label" parent="Panel/VBox/Tabs/システム / System/DisplayReportRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "ロード時にレポートを表示 / Show loading report"
+
+[node name="DisplayReportCheck" type="CheckBox" parent="Panel/VBox/Tabs/システム / System/DisplayReportRow"]
+layout_mode = 2
+
+; ----------------------------------------------------------------
+; Close button
+; ----------------------------------------------------------------
+[node name="CloseBtn" type="Button" parent="Panel/VBox"]
+layout_mode = 2
+text = "閉じる / Close  [ESC]"

@@ -41,7 +41,16 @@ internal sealed partial class EraStreamReader : IDisposable
 		nextNo = 0;
 		try
 		{
-			_fileLines = File.ReadAllLines(filepath, EncodingHandler.DetectEncoding(path));
+			// On Android/Web (res:// / user:// paths), System.IO.File is unavailable;
+			// fall back to the Preload cache populated by MainNode.PreloadGodotDir().
+			if (Preload.ContainsFile(path))
+			{
+				_fileLines = Preload.GetFileLines(path);
+			}
+			else
+			{
+				_fileLines = File.ReadAllLines(filepath, EncodingHandler.DetectEncoding(path));
+			}
 		}
 		catch
 		{

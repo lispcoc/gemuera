@@ -123,11 +123,12 @@ internal sealed partial class Process(IGameConsole view)
 			//_replace.csv読み込み
 			if (Config.UseReplaceFile && !Program.AnalysisMode)
 			{
-				if (File.Exists(Program.CsvDir + "_Replace.csv"))
+				string replacePath = Program.CsvDir + "_Replace.csv";
+				if (File.Exists(replacePath) || Preload.ContainsFile(replacePath))
 				{
 					if (Config.DisplayReport)
 						console.PrintSystemLine(trsl.LoadingReplace.Text);
-					ConfigData.Instance.LoadReplaceFile(Program.CsvDir + "_Replace.csv");
+					ConfigData.Instance.LoadReplaceFile(replacePath);
 					if (ParserMediator.HasWarning)
 					{
 						ParserMediator.FlushWarningList();
@@ -145,11 +146,12 @@ internal sealed partial class Process(IGameConsole view)
 			//_rename.csv読み込み
 			if (Config.UseRenameFile)
 			{
-				if (File.Exists(Program.CsvDir + "_Rename.csv"))
+				string renamePath = Program.CsvDir + "_Rename.csv";
+				if (File.Exists(renamePath) || Preload.ContainsFile(renamePath))
 				{
 					if (Config.DisplayReport || Program.AnalysisMode)
 						console.PrintSystemLine(trsl.LoadingRename.Text);
-					ParserMediator.LoadEraExRenameFile(Program.CsvDir + "_Rename.csv");
+					ParserMediator.LoadEraExRenameFile(renamePath);
 				}
 				else
 					console.PrintError(trsl.MissingRename.Text);

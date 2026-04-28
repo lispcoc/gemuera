@@ -1,6 +1,8 @@
-[gd_scene load_steps=3 format=3 uid="uid://console_scene"]
+[gd_scene load_steps=4 format=3 uid="uid://console_scene"]
 
 [ext_resource type="Script" path="res://src/UI/ConsoleNode.cs" id="1_console"]
+[ext_resource type="Script" path="res://src/UI/SettingsNode.cs" id="2_settings"]
+[ext_resource type="PackedScene" path="res://scenes/Settings.tscn" id="3_settings_scene"]
 
 [node name="Console" type="Control"]
 layout_mode = 3
@@ -17,6 +19,7 @@ StatusLabelPath = NodePath("VBox/StatusBar")
 BgmPlayerPath = NodePath("BgmPlayer")
 SePlayerPath = NodePath("SePlayer")
 CbgContainerPath = NodePath("CbgContainer")
+SettingsPath = NodePath("Settings")
 
 [node name="CbgContainer" type="Control" parent="."]
 layout_mode = 1
@@ -67,3 +70,5 @@ theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
 [node name="BgmPlayer" type="AudioStreamPlayer" parent="."]
 
 [node name="SePlayer" type="AudioStreamPlayer" parent="."]
+
+[node name="Settings" parent="." instance=ExtResource("3_settings_scene")]
