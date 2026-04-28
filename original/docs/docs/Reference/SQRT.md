@@ -1,0 +1,25 @@
+---
+hide:
+  - toc
+---
+
+# SQRT
+
+| 関数名                                                   | 引数  | 戻り値 |
+| :------------------------------------------------------- | :---- | :----- |
+| ![](../assets/images/IconEmuera.webp)[`SQRT`](./SQRT.md) | `int` | `int`  |
+
+!!! info "API"
+
+    ```  { #language-erbapi }
+	int SQRT int
+    ```
+    引数の平方根を返します。小数点以下は切り捨てられるため、予め値を大きく取ってから使用することを推奨します。
+
+
+!!! hint "ヒント"
+
+    命令、式中関数両方対応しています。
+
+### 関連項目
+- [CBRT, LOG, LOG10, EXPOMENT](MATH_EXTENSION.md)

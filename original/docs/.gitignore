@@ -1,0 +1,8 @@
+/public
+/release
+pyproject.toml
+poetry.lock
+*.ps1
+
+.vscode/*
+agents.md
