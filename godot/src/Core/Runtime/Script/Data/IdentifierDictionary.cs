@@ -150,9 +150,12 @@ internal partial class IdentifierDictionary
 		{
 			instructionDic = FunctionIdentifier.GetInstructionNameDic();
 		}
-		catch
+		catch (Exception ex)
 		{
-			throw new CodeEE(treer.DoNotInstallWMP.Text);
+			// Unwrap TypeInitializationException to get the real cause
+			Exception inner = ex;
+			while (inner.InnerException != null) inner = inner.InnerException;
+			throw new CodeEE($"FunctionIdentifier init failed: {inner.GetType().Name}: {inner.Message}\n{inner.StackTrace}");
 		}
 
 

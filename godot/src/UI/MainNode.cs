@@ -17,11 +17,12 @@ public partial class MainNode : Node
     // ----------------------------------------------------------------
 
     /// <summary>
-    /// Absolute or user:// path to the ERA game root folder.
+    /// Override path for the ERA game root folder.
+    /// If empty (default), the directory containing the executable is used.
     /// On Android this would typically be under user://
     /// On Web it would be a path to files bundled in the .pck
     /// </summary>
-    [Export] public string GameRootDir = "user://game";
+    [Export] public string GameRootDir = "";
 
     [Export] public bool DebugMode = false;
 
@@ -35,6 +36,7 @@ public partial class MainNode : Node
     private ConsoleNode _console;
     private MinorShift.Emuera.GameProc.Process _process;
     private bool _started = false;
+    private string _exeDir = "";
 
     // ----------------------------------------------------------------
     // Godot lifecycle
@@ -42,19 +44,13 @@ public partial class MainNode : Node
 
     public override void _Ready()
     {
-        // Determine log file path: next to the project, or user data dir as fallback
-        string logDir = ProjectSettings.GlobalizePath("user://");
-        string logPath = Path.Combine(logDir, "gemuera_runtime.log");
+        // Determine exe directory — used for logs and game root
+        _exeDir = Path.GetDirectoryName(OS.GetExecutablePath())
+            ?? AppDomain.CurrentDomain.BaseDirectory;
 
-        // Also write a copy next to repo root for easy access during development
-        string devLogPath = Path.Combine(
-            AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..",
-            "gemuera_runtime.log");
-
-        try { devLogPath = Path.GetFullPath(devLogPath); } catch { }
-
-        GemueraLogger.Init(File.Exists(logDir) || Directory.Exists(logDir)
-            ? logPath : devLogPath);
+        // Log files go next to the exe
+        string logPath = Path.Combine(_exeDir, "gemuera_runtime.log");
+        GemueraLogger.Init(logPath);
 
         // Hook unhandled C# exceptions (background threads)
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
@@ -67,9 +63,16 @@ public partial class MainNode : Node
 
         _console = GetNode<ConsoleNode>(ConsolePath);
 
-        // Resolve game root path via Godot's path system
-        string resolvedRoot = ProjectSettings.GlobalizePath(GameRootDir);
+        // Resolve game root path — use executable directory by default
+        string resolvedRoot;
+        if (!string.IsNullOrEmpty(GameRootDir))
+            resolvedRoot = ProjectSettings.GlobalizePath(GameRootDir);
+        else
+            resolvedRoot = _exeDir;
+
+        GD.Print($"[Gemuera] ExeDir: {_exeDir}");
         GD.Print($"[Gemuera] Game root: {resolvedRoot}");
+        GemueraLogger.Log($"ExeDir: {_exeDir}");
         GemueraLogger.Log($"Game root resolved: {resolvedRoot}");
         GemueraLogger.Log($"Log file: {logPath}");
 
@@ -92,9 +95,17 @@ public partial class MainNode : Node
             MinorShift.Emuera.Runtime.Config.ConfigData.Instance.LoadConfig();
             MinorShift.Emuera.Runtime.Config.Config.SetConfig(
                 MinorShift.Emuera.Runtime.Config.ConfigData.Instance);
+            MinorShift.Emuera.Runtime.Config.JSON.JSONConfig.Load();
             GemueraLogger.Log("Config loaded.");
 
-            // 3. Create and initialise the interpreter (EmueraConsole is created inside Process)
+            // 3. Preload all ERB/CSV files into memory cache (mirrors EmueraConsole.StartConsole)
+            GemueraLogger.Log("Preloading files...");
+            MinorShift.Emuera.Runtime.Utils.Preload.Clear();
+            await MinorShift.Emuera.Runtime.Utils.Preload.Load(Program.ErbDir);
+            await MinorShift.Emuera.Runtime.Utils.Preload.Load(Program.CsvDir);
+            GemueraLogger.Log("Preload done.");
+
+            // 4. Create and initialise the interpreter (EmueraConsole is created inside Process)
             GemueraLogger.Log("Creating Process...");
             _process = new MinorShift.Emuera.GameProc.Process(_console);
             GlobalStatic.Process  = _process;
@@ -103,9 +114,7 @@ public partial class MainNode : Node
             GemueraLogger.Log("Calling Process.Initialize...");
             // Pass a StreamWriter so Process.Initialize reports each sub-step
             using var logWriter = new System.IO.StreamWriter(
-                System.IO.Path.Combine(
-                    ProjectSettings.GlobalizePath("user://"),
-                    "gemuera_init.log"),
+                Path.Combine(_exeDir, "gemuera_init.log"),
                 append: false, System.Text.Encoding.UTF8);
             logWriter.AutoFlush = true;
             bool ok = await _process.Initialize(logWriter);

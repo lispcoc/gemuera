@@ -2,9 +2,9 @@
 setlocal enabledelayedexpansion
 
 :: ============================================================
-:: Gemuera — 配布ファイル生成バッチ
-:: 使い方: build_dist.bat [windows] [web] [android] [all]
-::   引数なし / all → 全プラットフォームをビルド
+:: Gemuera - Distribution build script
+:: Usage: build_dist.bat [windows] [web] [android] [all]
+::   No args / all -> build all platforms
 :: ============================================================
 
 set GODOT=D:\Github\gemuera\tools\godot\Godot_v4.3-stable_mono_win64\Godot_v4.3-stable_mono_win64.exe
@@ -36,38 +36,38 @@ set BUILD_ANDROID=1
 :check_presets
 :: --- 前提チェック ---
 if not exist "%GODOT%" (
-    echo [ERROR] Godot が見つかりません: %GODOT%
+    echo [ERROR] Godot not found: %GODOT%
     exit /b 1
 )
 
 if not exist "%EXPORT_PRESETS%" (
-    echo [WARN] export_presets.cfg が見つかりません。
-    echo        Godot エディターで以下のプリセット名を作成してから再実行してください:
+    echo [WARN] export_presets.cfg not found.
+    echo        Please create the following presets in Godot Editor then re-run:
     echo          - Windows Desktop
     echo          - Web
     echo          - Android
     echo        %EXPORT_PRESETS%
     echo.
-    echo        Godot エディターを起動するには open_godot.bat を実行してください。
+    echo        To open Godot Editor, run open_godot.bat
     exit /b 1
 )
 
-:: --- dotnet ビルド ---
+:: --- dotnet build ---
 echo.
 echo ========================================
-echo  C# ビルド (dotnet build)
+echo  C# Build (dotnet build)
 echo ========================================
 pushd "%PROJECT_DIR%"
 dotnet build Gemuera.csproj -c Release
 if errorlevel 1 (
-    echo [ERROR] dotnet build に失敗しました。
+    echo [ERROR] dotnet build failed.
     popd
     exit /b 1
 )
 popd
-echo [OK] C# ビルド完了
+echo [OK] C# build succeeded
 
-:: --- dist フォルダ準備 ---
+:: --- dist folder ---
 if not exist "%DIST_DIR%" mkdir "%DIST_DIR%"
 
 :: ============================================================
@@ -76,7 +76,7 @@ if not exist "%DIST_DIR%" mkdir "%DIST_DIR%"
 if "%BUILD_WINDOWS%"=="1" (
     echo.
     echo ========================================
-    echo  エクスポート: Windows Desktop
+    echo  Export: Windows Desktop
     echo ========================================
     set OUT_DIR=%DIST_DIR%\windows
     if not exist "!OUT_DIR!" mkdir "!OUT_DIR!"
@@ -84,7 +84,7 @@ if "%BUILD_WINDOWS%"=="1" (
     "%GODOT%" --headless --path "%PROJECT_DIR%" ^
         --export-release "Windows Desktop" "!OUT_DIR!\Gemuera.exe"
     if errorlevel 1 (
-        echo [ERROR] Windows エクスポートに失敗しました。
+        echo [ERROR] Windows export failed.
     ) else (
         echo [OK] Windows: !OUT_DIR!\Gemuera.exe
     )
@@ -96,7 +96,7 @@ if "%BUILD_WINDOWS%"=="1" (
 if "%BUILD_WEB%"=="1" (
     echo.
     echo ========================================
-    echo  エクスポート: Web (HTML5/WASM^)
+    echo  Export: Web (HTML5/WASM)
     echo ========================================
     set OUT_DIR=%DIST_DIR%\web
     if not exist "!OUT_DIR!" mkdir "!OUT_DIR!"
@@ -104,7 +104,7 @@ if "%BUILD_WEB%"=="1" (
     "%GODOT%" --headless --path "%PROJECT_DIR%" ^
         --export-release "Web" "!OUT_DIR!\index.html"
     if errorlevel 1 (
-        echo [ERROR] Web エクスポートに失敗しました。
+        echo [ERROR] Web export failed.
     ) else (
         echo [OK] Web: !OUT_DIR!\index.html
     )
@@ -116,7 +116,7 @@ if "%BUILD_WEB%"=="1" (
 if "%BUILD_ANDROID%"=="1" (
     echo.
     echo ========================================
-    echo  エクスポート: Android
+    echo  Export: Android
     echo ========================================
     set OUT_DIR=%DIST_DIR%\android
     if not exist "!OUT_DIR!" mkdir "!OUT_DIR!"
@@ -124,7 +124,7 @@ if "%BUILD_ANDROID%"=="1" (
     "%GODOT%" --headless --path "%PROJECT_DIR%" ^
         --export-release "Android" "!OUT_DIR!\Gemuera.apk"
     if errorlevel 1 (
-        echo [ERROR] Android エクスポートに失敗しました。
+        echo [ERROR] Android export failed.
     ) else (
         echo [OK] Android: !OUT_DIR!\Gemuera.apk
     )
@@ -132,7 +132,7 @@ if "%BUILD_ANDROID%"=="1" (
 
 echo.
 echo ========================================
-echo  完了: %DIST_DIR%
+echo  Done: %DIST_DIR%
 echo ========================================
 dir /b "%DIST_DIR%"
 
