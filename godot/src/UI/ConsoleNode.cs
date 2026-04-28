@@ -8,6 +8,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
 using EraConfig = MinorShift.Emuera.Runtime.Config.Config;
@@ -83,6 +84,29 @@ public partial class ConsoleNode : Control, IGameConsole
     private static readonly Regex _bracketNumRegex =
         new(@"\[lb\](\d+)\]((?:(?!\[lb\])(?!\[/)(?!\n).)*)",
             RegexOptions.Compiled);
+    // Extract [url=VALUE] values from BBCode for controller choice navigation.
+    private static readonly Regex _urlValueRegex =
+        new(@"\[url=([^\]]+)\]", RegexOptions.Compiled);
+    // Match a complete [url=VALUE]…[/url] block for highlight replacement.
+    private static readonly Regex _urlFullRegex =
+        new(@"\[url=([^\]]+)\](.*?)\[/url\]",
+            RegexOptions.Singleline | RegexOptions.Compiled);
+
+    // ----------------------------------------------------------------
+    // Controller / gamepad state
+    // ----------------------------------------------------------------
+
+    // Available selectable choices for the current INPUT (populated from [url=…] links).
+    private readonly List<string> _controllerChoices = new();
+    // Currently highlighted choice index (-1 = none highlighted yet).
+    private int _controllerChoiceIndex = -1;
+
+    // Position in _bbcodeAccum where the current menu section starts (for highlight overlay).
+    private int _menuStartPos = -1;
+    // Whether _richText.Text currently has a highlight overlay (differs from _bbcodeAccum).
+    private bool _highlightActive;
+    // URL value currently under the mouse cursor (null = no hover).
+    private string _mouseHoverValue;
 
     // ----------------------------------------------------------------
     // Godot lifecycle
@@ -102,7 +126,9 @@ public partial class ConsoleNode : Control, IGameConsole
         _inputLine.Editable = false; // disabled until INPUT command
 
         // Connect button (URL tag) click
-        _richText.MetaClicked += OnMetaClicked;
+        _richText.MetaClicked      += OnMetaClicked;
+        _richText.MetaHoverStarted += OnMetaHoverStarted;
+        _richText.MetaHoverEnded   += OnMetaHoverEnded;
 
         _bgmPlayer = GetNode<AudioStreamPlayer>(BgmPlayerPath);
         _sePlayer  = GetNode<AudioStreamPlayer>(SePlayerPath);
@@ -118,6 +144,226 @@ public partial class ConsoleNode : Control, IGameConsole
             try { action(); }
             catch (Exception e) { GD.PrintErr($"[ConsoleNode] UI action error: {e}"); }
         }
+
+        // Right stick vertical: continuous scroll (works without focus).
+        float rightY = Input.GetJoyAxis(0, JoyAxis.RightY);
+        if (Mathf.Abs(rightY) > 0.25f && _scroll != null)
+        {
+            int scrollDelta = (int)(rightY * 500f * (float)delta);
+            _scroll.ScrollVertical = Mathf.Max(0, _scroll.ScrollVertical + scrollDelta);
+        }
+    }
+
+    // ----------------------------------------------------------------
+    // Controller (joypad) input
+    // ----------------------------------------------------------------
+
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        if (@event is not InputEventJoypadButton pad || !pad.Pressed) return;
+
+        var req = _pendingRequest;
+        var tcs = _inputTcs;
+        bool hasPending = req != null && tcs != null && !tcs.Task.IsCompleted;
+
+        switch (pad.ButtonIndex)
+        {
+            // A / Cross — confirm / advance
+            case JoyButton.A:
+                if (!hasPending) return;
+                GetViewport().SetInputAsHandled();
+                if (req.InputType == InputType.AnyKey || req.InputType == InputType.EnterKey)
+                {
+                    _inputLine.Editable = false;
+                    _inputLine.PlaceholderText = "入力してEnterキー / Type and press Enter";
+                    ClearControllerState();
+                    tcs.TrySetResult(new InputResult { Value = "" });
+                }
+                else if (req.InputType == InputType.IntValue
+                      || req.InputType == InputType.IntButton
+                      || req.InputType == InputType.AnyValue)
+                {
+                    // Submit the value shown in the input line (updated by D-pad navigation).
+                    ClearControllerState();
+                    OnInputSubmitted(_inputLine.Text);
+                }
+                else if (req.InputType == InputType.PrimitiveMouseKey)
+                {
+                    _inputLine.Editable = false;
+                    ClearControllerState();
+                    tcs.TrySetResult(new InputResult { MouseType = 4, MouseButton = 0,
+                        MouseX = (int)_lastMousePos.X, MouseY = (int)_lastMousePos.Y });
+                }
+                return;
+
+            // B / Circle — advance for WAIT-type inputs (same as any key)
+            case JoyButton.B:
+                if (!hasPending) return;
+                if (req.InputType == InputType.AnyKey || req.InputType == InputType.EnterKey)
+                {
+                    GetViewport().SetInputAsHandled();
+                    _inputLine.Editable = false;
+                    _inputLine.PlaceholderText = "入力してEnterキー / Type and press Enter";
+                    ClearControllerState();
+                    tcs.TrySetResult(new InputResult { Value = "" });
+                }
+                return;
+
+            // D-pad Up — navigate to previous choice, or scroll up
+            case JoyButton.DpadUp:
+                GetViewport().SetInputAsHandled();
+                if (_controllerChoices.Count > 0)
+                {
+                    _controllerChoiceIndex = (_controllerChoiceIndex <= 0
+                        ? _controllerChoices.Count : _controllerChoiceIndex) - 1;
+                    ApplyControllerChoice();
+                }
+                else if (_scroll != null)
+                {
+                    _scroll.ScrollVertical = Mathf.Max(0, _scroll.ScrollVertical - 80);
+                }
+                return;
+
+            // D-pad Down — navigate to next choice, or scroll down
+            case JoyButton.DpadDown:
+                GetViewport().SetInputAsHandled();
+                if (_controllerChoices.Count > 0)
+                {
+                    _controllerChoiceIndex = (_controllerChoiceIndex + 1) % _controllerChoices.Count;
+                    ApplyControllerChoice();
+                }
+                else if (_scroll != null)
+                {
+                    _scroll.ScrollVertical += 80;
+                }
+                return;
+
+            // L1 — page up
+            case JoyButton.LeftShoulder:
+                GetViewport().SetInputAsHandled();
+                if (_scroll != null)
+                    _scroll.ScrollVertical = Mathf.Max(0, _scroll.ScrollVertical - (int)_scroll.Size.Y);
+                return;
+
+            // R1 — page down
+            case JoyButton.RightShoulder:
+                GetViewport().SetInputAsHandled();
+                if (_scroll != null)
+                    _scroll.ScrollVertical += (int)_scroll.Size.Y;
+                return;
+        }
+    }
+
+    /// <summary>Set the input line text to the currently selected controller choice and update the status bar hint.</summary>
+    private void ApplyControllerChoice()
+    {
+        if (_controllerChoiceIndex < 0 || _controllerChoiceIndex >= _controllerChoices.Count) return;
+        string val = _controllerChoices[_controllerChoiceIndex];
+        _inputLine.Text = val;
+        _inputLine.CaretColumn = val.Length;
+        _statusBar.Text =
+            $"[コントローラー] ▶  {val}  ({_controllerChoiceIndex + 1}/{_controllerChoices.Count})  ↑↓選択  Aで決定";
+        UpdateHighlight();
+    }
+
+    /// <summary>Populate controller choices from [url=…] tags found in the given BBCode section.</summary>
+    private void ExtractControllerChoices(string bbSection)
+    {
+        _controllerChoices.Clear();
+        _controllerChoiceIndex = -1;
+        var seen = new HashSet<string>();
+        foreach (Match m in _urlValueRegex.Matches(bbSection))
+        {
+            string val = m.Groups[1].Value;
+            if (seen.Add(val))
+                _controllerChoices.Add(val);
+        }
+        if (_controllerChoices.Count > 0)
+        {
+            _controllerChoiceIndex = 0;
+            ApplyControllerChoice();
+        }
+    }
+
+    /// <summary>Reset controller navigation state and clear any hint from the status bar.</summary>
+    private void ClearControllerState()
+    {
+        _controllerChoices.Clear();
+        _controllerChoiceIndex = -1;
+        _mouseHoverValue = null;
+        _menuStartPos = -1;
+        if (_statusBar != null) _statusBar.Text = "";
+        UpdateHighlight(); // restores _richText.Text if a highlight overlay was active
+    }
+
+    /// <summary>
+    /// Apply or remove the hover/selection highlight overlay on the menu section.
+    /// Mouse hover takes precedence over controller navigation.
+    /// Must be called on the Godot main thread.
+    /// </summary>
+    private void UpdateHighlight()
+    {
+        // Mouse hover takes precedence; fall back to controller index
+        string targetVal = _mouseHoverValue;
+        if (targetVal == null && _controllerChoiceIndex >= 0 && _controllerChoiceIndex < _controllerChoices.Count)
+            targetVal = _controllerChoices[_controllerChoiceIndex];
+
+        if (targetVal == null || _menuStartPos < 0 || _menuStartPos > _bbcodeAccum.Length)
+        {
+            // No highlight needed — restore plain accumulator content if we had an overlay
+            if (_highlightActive)
+            {
+                _highlightActive = false;
+                int savedScroll = _scroll?.ScrollVertical ?? 0;
+                _richText.Text = _bbcodeAccum.ToString();
+                if (_scroll != null) _scroll.ScrollVertical = savedScroll;
+            }
+            return;
+        }
+
+        string fullBb  = _bbcodeAccum.ToString();
+        string prefix  = _menuStartPos > 0 ? fullBb[.._menuStartPos] : "";
+        string menu    = fullBb[_menuStartPos..];
+        string capturedVal = targetVal; // avoid closure capture of mutable local
+
+        string highlighted = _urlFullRegex.Replace(menu, m =>
+        {
+            string val   = m.Groups[1].Value;
+            string inner = m.Groups[2].Value;
+            return val == capturedVal
+                ? $"[url={val}][bgcolor=#1A3A6A]{inner}[/bgcolor][/url]"
+                : m.Value;
+        });
+
+        int saved = _scroll?.ScrollVertical ?? 0;
+        _richText.Text = prefix + highlighted;
+        if (_scroll != null) _scroll.ScrollVertical = saved;
+        _highlightActive = true;
+    }
+
+    // Called when the mouse cursor enters a [url=…] link
+    private void OnMetaHoverStarted(Variant meta)
+    {
+        if (_controllerChoices.Count == 0) return; // no active menu
+        string val = meta.AsString();
+        _mouseHoverValue = val;
+        int idx = _controllerChoices.IndexOf(val);
+        if (idx >= 0) _controllerChoiceIndex = idx;
+        UpdateHighlight();
+        if (_statusBar != null)
+            _statusBar.Text = $"▶  {val}  ({_controllerChoiceIndex + 1}/{_controllerChoices.Count})";
+    }
+
+    // Called when the mouse cursor leaves a [url=…] link
+    private void OnMetaHoverEnded(Variant meta)
+    {
+        _mouseHoverValue = null;
+        UpdateHighlight(); // restores plain or controller-highlight
+        // Restore controller hint if controller navigation is active
+        if (_controllerChoices.Count > 0 && _controllerChoiceIndex >= 0)
+            _statusBar.Text = $"[コントローラー] ▶  {_controllerChoices[_controllerChoiceIndex]}  ({_controllerChoiceIndex + 1}/{_controllerChoices.Count})  ↑↓選択  Aで決定";
+        else if (_statusBar != null)
+            _statusBar.Text = "";
     }
 
     // Accept any key press for WAIT / WAITANYKEY / INPUTMOUSEKEY
@@ -154,7 +400,23 @@ public partial class ConsoleNode : Control, IGameConsole
 
             var req = _pendingRequest;
             var tcs = _inputTcs;
-            if (req != null && tcs != null && !tcs.Task.IsCompleted)
+            bool hasPending = req != null && tcs != null && !tcs.Task.IsCompleted;
+
+            // ── Escape: advance WAIT / AnyKey (same as B button) ────────────────
+            if (key.Keycode == Key.Escape && hasPending)
+            {
+                if (req.InputType == InputType.AnyKey || req.InputType == InputType.EnterKey)
+                {
+                    GetViewport().SetInputAsHandled();
+                    _inputLine.Editable = false;
+                    _inputLine.PlaceholderText = "入力してEnterキー / Type and press Enter";
+                    ClearControllerState();
+                    tcs.TrySetResult(new InputResult { Value = "" });
+                    return;
+                }
+            }
+
+            if (hasPending)
             {
                 if (req.InputType == InputType.AnyKey)
                 {
@@ -250,7 +512,15 @@ public partial class ConsoleNode : Control, IGameConsole
 
     public void ClearScreen()
     {
-        Enqueue(() => { _richText.Clear(); _bbcodeAccum.Clear(); _lastInputPos = 0; });
+        Enqueue(() =>
+        {
+            _richText.Clear();
+            _bbcodeAccum.Clear();
+            _lastInputPos = 0;
+            _menuStartPos = -1;
+            _mouseHoverValue = null;
+            _highlightActive = false;
+        });
     }
 
     public void PrintHtml(string html)
@@ -497,7 +767,24 @@ public partial class ConsoleNode : Control, IGameConsole
                     }
                 }
             }
+            int prevLastInputPos = _lastInputPos;
             _lastInputPos = _bbcodeAccum.Length;
+
+            // Populate controller choices from the just-linkified menu section.
+            if (request.InputType == InputType.IntValue
+             || request.InputType == InputType.IntButton
+             || request.InputType == InputType.AnyValue)
+            {
+                string bb = _bbcodeAccum.ToString();
+                // The menu is the section between old lastInputPos and new lastInputPos.
+                string menuSection = prevLastInputPos < bb.Length ? bb[prevLastInputPos..] : "";
+                _menuStartPos = prevLastInputPos; // store for highlight overlay
+                ExtractControllerChoices(menuSection);
+            }
+            else
+            {
+                ClearControllerState();
+            }
 
             _inputLine.Clear();
 
@@ -589,6 +876,7 @@ public partial class ConsoleNode : Control, IGameConsole
 
         _inputLine.Editable = false;
         _inputLine.PlaceholderText = "入力してEnterキー / Type and press Enter";
+        ClearControllerState();
 
         // For ONEINPUT: accept only 1 digit / character
         string value = text;
@@ -607,6 +895,7 @@ public partial class ConsoleNode : Control, IGameConsole
         if (tcs == null || tcs.Task.IsCompleted) return;
         _inputLine.Editable = false;
         _inputLine.PlaceholderText = "入力してEnterキー / Type and press Enter";
+        ClearControllerState();
         tcs.TrySetResult(new InputResult
         {
             Value = val,
@@ -648,6 +937,43 @@ public partial class ConsoleNode : Control, IGameConsole
         {
             _lastMousePos = mm.Position;
             return;
+        }
+
+        // ── Intercept arrow / page keys BEFORE LineEdit steals them ─────────
+        if (@event is InputEventKey navKey && navKey.Pressed && !navKey.Echo)
+        {
+            if (navKey.Keycode == Key.Up || navKey.Keycode == Key.Down)
+            {
+                bool up = navKey.Keycode == Key.Up;
+                if (_controllerChoices.Count > 0)
+                {
+                    GetViewport().SetInputAsHandled();
+                    if (up)
+                        _controllerChoiceIndex = (_controllerChoiceIndex <= 0
+                            ? _controllerChoices.Count : _controllerChoiceIndex) - 1;
+                    else
+                        _controllerChoiceIndex = (_controllerChoiceIndex + 1) % _controllerChoices.Count;
+                    ApplyControllerChoice();
+                    return;
+                }
+                else if (_scroll != null)
+                {
+                    GetViewport().SetInputAsHandled();
+                    _scroll.ScrollVertical = Mathf.Max(0, _scroll.ScrollVertical + (up ? -80 : 80));
+                    return;
+                }
+            }
+            else if (navKey.Keycode == Key.Pageup || navKey.Keycode == Key.Pagedown)
+            {
+                GetViewport().SetInputAsHandled();
+                if (_scroll != null)
+                {
+                    int delta = (int)_scroll.Size.Y;
+                    _scroll.ScrollVertical = Mathf.Max(0,
+                        _scroll.ScrollVertical + (navKey.Keycode == Key.Pageup ? -delta : delta));
+                }
+                return;
+            }
         }
 
         // PrimitiveMouseKey — capture mouse button press or scroll wheel
