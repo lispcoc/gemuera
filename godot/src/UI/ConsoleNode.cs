@@ -50,8 +50,13 @@ public partial class ConsoleNode : Control, IGameConsole
     private int _bgArgb = unchecked((int)0xFF000000);
     private TextStyleFlags _styleFlags = TextStyleFlags.Normal;
 
-    // Font size (updated by ApplyConfigFont; used for char-width estimation)
+    // Font size / metrics (updated by ApplyConfigFont)
     private int _fontSize = 18;
+    private Font _activeFont;     // stored after ApplyConfigFont, used for char-width measurement
+    private float _charWidth = 9; // width of a single half-width character in pixels
+
+    // Current function-key macro group (0 = default; Shift+F1..F10 cycles 0..9)
+    private int _macroGroup = 0;
 
     // Current input request
     private TaskCompletionSource<InputResult> _inputTcs;
@@ -101,6 +106,33 @@ public partial class ConsoleNode : Control, IGameConsole
     {
         if (@event is InputEventKey key && key.Pressed && !key.Echo)
         {
+            // Function-key macro injection (F1–F12)
+            if (EraConfig.UseKeyMacro && !key.AltPressed)
+            {
+                int fkeyIdx = GetFunctionKeyIndex(key.Keycode);
+                if (fkeyIdx >= 0)
+                {
+                    if (key.ShiftPressed && fkeyIdx < MinorShift.Emuera.Runtime.Script.KeyMacro.MaxGroup)
+                    {
+                        // Shift+F1..F10 selects macro group 0..9
+                        _macroGroup = fkeyIdx;
+                        GetViewport().SetInputAsHandled();
+                        return;
+                    }
+                    if (!key.ShiftPressed)
+                    {
+                        string macroText = MinorShift.Emuera.Runtime.Script.KeyMacro.GetMacro(fkeyIdx, _macroGroup);
+                        if (macroText != null && macroText.Length > 0 && _inputLine.Editable)
+                        {
+                            _inputLine.Text = macroText;
+                            _inputLine.CaretColumn = macroText.Length;
+                            GetViewport().SetInputAsHandled();
+                            return;
+                        }
+                    }
+                }
+            }
+
             var req = _pendingRequest;
             var tcs = _inputTcs;
             if (req != null && tcs != null && !tcs.Task.IsCompleted)
@@ -135,6 +167,15 @@ public partial class ConsoleNode : Control, IGameConsole
 
     private void Enqueue(Action a) => _uiQueue.Enqueue(a);
 
+    /// <summary>Returns 0-based function key index for F1–F12, or -1 for other keys.</summary>
+    private static int GetFunctionKeyIndex(Key keycode) => keycode switch
+    {
+        Key.F1  => 0,  Key.F2  => 1,  Key.F3  => 2,  Key.F4  => 3,
+        Key.F5  => 4,  Key.F6  => 5,  Key.F7  => 6,  Key.F8  => 7,
+        Key.F9  => 8,  Key.F10 => 9,  Key.F11 => 10, Key.F12 => 11,
+        _       => -1,
+    };
+
     // ----------------------------------------------------------------
     // IGameConsole implementation
     // ----------------------------------------------------------------
@@ -160,9 +201,8 @@ public partial class ConsoleNode : Control, IGameConsole
         Enqueue(() =>
         {
             int px = (int)_richText.Size.X;
-            // Half-width char width ≈ half the font size (monospace CJK assumption)
-            int charWidth = System.Math.Max(6, _fontSize / 2);
-            int count = px > 0 ? System.Math.Max(20, px / charWidth) : 60;
+            float charWidth = _charWidth > 0 ? _charWidth : System.Math.Max(6f, _fontSize / 2f);
+            int count = px > 0 ? System.Math.Max(20, (int)(px / charWidth)) : 60;
             string ruleBb = $"[color=#888888]{new string(ch, count)}[/color]\n";
             _richText.AppendText(ruleBb);
         });
@@ -281,6 +321,23 @@ public partial class ConsoleNode : Control, IGameConsole
         {
             _bgmPlayer.Stop();
             _currentBgmPath = null;
+        });
+    }
+    public void FadeBgm(int durationMs)
+    {
+        Enqueue(() =>
+        {
+            if (!_bgmPlayer.Playing) return;
+            int ms = durationMs > 0 ? durationMs : 500;
+            float startDb   = _bgmPlayer.VolumeDb;
+            var tween = CreateTween();
+            tween.TweenProperty(_bgmPlayer, "volume_db", -80f, ms / 1000.0);
+            tween.TweenCallback(Callable.From(() =>
+            {
+                _bgmPlayer.Stop();
+                _bgmPlayer.VolumeDb = startDb; // restore so next PLAYBGM is at normal volume
+                _currentBgmPath = null;
+            }));
         });
     }
     public void PlaySound(string resourcePath)
@@ -651,6 +708,11 @@ public partial class ConsoleNode : Control, IGameConsole
         // Apply to the input field
         _inputLine.AddThemeFontOverride("font", sysFont);
         _inputLine.AddThemeFontSizeOverride("font_size", fontSize);
+
+        // Cache font reference and measure half-width character width
+        _activeFont = sysFont;
+        var szM = sysFont.GetStringSize("M", HorizontalAlignment.Left, -1, fontSize);
+        _charWidth = szM.X > 0 ? szM.X : System.Math.Max(6f, fontSize / 2f);
     }
 
     private static string ToBbcode(string text, StringStyle style)

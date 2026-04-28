@@ -74,6 +74,9 @@ public interface IGameConsole
     /// <summary>STOPBGM — stop the BGM.</summary>
     void StopBgm();
 
+    /// <summary>Fade out the BGM volume over the given duration (ms), then stop.</summary>
+    void FadeBgm(int durationMs);
+
     /// <summary>PLAYSOUND — play a sound effect.</summary>
     void PlaySound(string resourcePath);
 

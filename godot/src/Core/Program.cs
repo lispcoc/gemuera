@@ -50,6 +50,16 @@ internal static class Program
     }
 
     /// <summary>
+    /// Override only the config lookup directory (ExeDir) without changing other paths.
+    /// Used on Android/Web when emuera.config lives under user://.
+    /// </summary>
+    public static void SetConfigDir(string dir)
+    {
+        if (!string.IsNullOrEmpty(dir))
+            ExeDir = dir.TrimEnd('/', '\\') + Path.DirectorySeparatorChar;
+    }
+
+    /// <summary>
     /// Must be called by the Godot UI layer before creating Process.
     /// </summary>
     public static void SetPaths(string gameRootDir, bool debugMode = false, bool analysisMode = false)

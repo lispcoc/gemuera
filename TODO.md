@@ -88,7 +88,7 @@ d:\Github\gemuera\
 - [x] CBG (クライアント背景画像) 対応 (`TextureRect` + `CbgContainer`)
 - [x] フォント設定 (Godot `SystemFont` によるCJKフォント適用 + `ApplyConfigFont()` をMainNodeから呼び出し)
 - [ ] フォントファイル同梱 (Godot `FontFile` 読み込み / CJKフォント同梱 — Android/Web向け)
-- [ ] 文字幅計算の実装 (`Font.get_string_size()`)
+- [x] 文字幅計算の実装 (`Font.get_string_size()`)
 
 ## フェーズ 3 — 入力処理の実装
 
@@ -98,13 +98,13 @@ d:\Github\gemuera\
 - [x] タイムアウト付き入力 (`TINPUT`/`TINPUTS`) (Timelimit / IsTimeOut / IsTimeout)
 - [x] ボタン番号選択 (`INPUT` with button display) (OnMetaClicked)
 - [x] マウス入力 (`MOUSE_*`/`INPUTMOUSEKEY`) 対応 (PrimitiveMouseKey — `_Input` ハンドラーでキャッチ、InputResult.MouseType/Button/X/Y/Count)
-- [ ] ファンクションキー・マクロ機能
+- [x] ファンクションキー・マクロ機能
 
 ## フェーズ 4 — ファイルI/O・セーブロード
 
 - [x] Android/Web: セーブデータディレクトリを `user://sav` にリダイレクト (`Program.SetSavDir`)
 - [x] Android/Web: ERB/CSV ファイルを Godot `DirAccess`/`FileAccess` 経由でプリロード (`PreloadGodotDir`)
-- [ ] `emuera.config` 読み込み (Android/Web: `user://` 対応)
+- [x] `emuera.config` 読み込み (Android/Web: `user://` 対応)
 - [ ] セーブデータの読み書き (バイナリ) — 動作確認
 - [ ] _Replace.csv / _Rename.csv 適用
 
@@ -113,10 +113,10 @@ d:\Github\gemuera\
 - [x] BGM再生 (ogg/mp3) — `AudioStreamPlayer` + `AudioStreamOggVorbis`/`AudioStreamMP3` (ループ対応)
 - [x] SE (効果音) 再生 — `AudioStreamPlayer`
 - [x] WAV再生対応 (`AudioStreamWav`)
-- [ ] フェード対応
+- [x] フェード対応
 - [x] WMPLib・NAudio依存の完全除去 (`SoundManager` → `IGameConsole` 経由)
 - [x] BGM/SE ボリューム制御 (`SetBgmVolume`/`SetSeVolume` → `AudioStreamPlayer.VolumeDb`)
-- [ ] フェード対応
+- [x] フェード対応
 
 ## フェーズ 6 — 画像・WebP対応
 

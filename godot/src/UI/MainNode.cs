@@ -102,6 +102,15 @@ public partial class MainNode : Node
                 Directory.CreateDirectory(savDir);
                 Program.SetSavDir(savDir);
                 GemueraLogger.Log($"Platform={featureName}: SavDir redirected to user://sav -> {savDir}");
+
+                // On Android/Web, emuera.config can be placed in user:// by the player.
+                // If it exists there, redirect ExeDir so ConfigData picks it up.
+                if (GodotFileAccess.FileExists("user://emuera.config"))
+                {
+                    string userDir = ProjectSettings.GlobalizePath("user://");
+                    Program.SetConfigDir(userDir);
+                    GemueraLogger.Log($"Platform={featureName}: emuera.config found in user://, ExeDir redirected to {userDir}");
+                }
             }
             GemueraLogger.Log($"Paths set. ExeDir={Program.ExeDir}  ErbDir={Program.ErbDir}");
 

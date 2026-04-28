@@ -25,6 +25,11 @@ internal static class SoundManager
         _console?.StopBgm();
     }
 
+    public static void FadeBgm(int durationMs)
+    {
+        _console?.FadeBgm(durationMs);
+    }
+
     public static void PlaySound(string path)
     {
         _console?.PlaySound(path);
