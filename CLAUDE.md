@@ -73,6 +73,8 @@ d:\Github\gemuera\
 
 ### ✅ フェーズ 1 — 基盤構築（完了）
 
+**`dotnet build` ビルド成功 — 0 エラー / 0 警告**
+
 元の Emuera コードを3つの方法で `godot/src/Core/` に配置済み：
 
 1. **そのままコピー** — Windows依存なし（Parser, Data, Statements 大半）
@@ -104,19 +106,24 @@ d:\Github\gemuera\
 |---|---|---|
 | `Utils/SoundManager.cs` | WMPLib COM / NAudio | IGameConsoleに委譲 |
 | `Utils/WinmmTimer.cs` | `winmm.dll` P/Invoke | `Environment.TickCount64` |
-| `Utils/WinInput.cs` | Win32 keyboard hooks | no-op |
+| `Utils/WinInput.cs` | Win32 keyboard hooks | no-op (`GetKeyState`返り値0) |
 | `Utils/WebPWrapper.cs` | `libwebp.dll` P/Invoke | Godot組込みWebP使用予定 |
 | `Utils/Sys.cs` | `System.Windows.Forms` | WinForms除去、`#if GODOT` 分岐 |
-| `Utils/PluginSystem/PluginManager.cs` | `Assembly.LoadFrom()` | 空リスト返却 |
+| `Utils/PluginSystem/PluginManager.cs` | `Assembly.LoadFrom()` | シングルトン、空リスト返却 |
+| `Utils/Sound.cs` | WMPLib/NAudio 再生 | `isPlaying()` / `setVolume()` stub |
 
 #### 新規作成ファイル
 
 | ファイル | 説明 |
 |---|---|
-| `src/Core/EraColor.cs` | System.Drawing.Color の軽量代替 |
-| `src/Core/Program.cs` | クロスプラットフォーム向けパス設定 |
+| `src/Core/EraColor.cs` | System.Drawing.Color の軽量代替（`FromName`含む） |
+| `src/Core/Program.cs` | パス設定（`ExeDir`/`CsvDir`/`ErbDir`/`SavDir`/`ContentDir`/`DatDir`/`SoundDir`） |
 | `src/Core/GlobalStatic.cs` | WindowsForm依存を除いた版 |
-| `src/Bridge/IGameConsole.cs` | Print/Input/Sound/CBG等の抽象IF |
+| `src/Core/DrawingCompat.cs` | `System.Drawing.*` 全域スタブ（Color/Font/Graphics/Pen/Brush/Rectangle等） |
+| `src/Core/GameView/EmueraConsole.cs` | IGameConsoleラッパー。ERA解釈器が直接呼ぶ全APIを実装 |
+| `src/Core/GameView/UIGameTypes.cs` | `HtmlManager`/`ConsoleDisplayLine`等スタブ |
+| `src/Core/GameView/ImageStubs.cs` | `AbstractImage`/`GraphicsImage`/`ASprite`/`AppContents`等スタブ |
+| `src/Bridge/IGameConsole.cs` | Print/Input/Sound/CBG/GetWindowTitle 等の抽象IF |
 | `src/Bridge/DisplayPackets.cs` | StringStyle, InputResult 型 |
 | `src/UI/ConsoleNode.cs` | RichTextLabel+LineEditによる実装 |
 | `src/UI/MainNode.cs` | インタープリター起動・管理 |
@@ -126,6 +133,8 @@ d:\Github\gemuera\
 ### 🔲 フェーズ 2〜9 — 未着手
 
 詳細は [TODO.md](./TODO.md) を参照。
+
+> **次のステップ**: フェーズ 2 — `EmueraConsole.Print*` → `IGameConsole` → Godot `RichTextLabel` へのリアルタイム表示パイプラインの実装。
 
 ---
 
@@ -195,13 +204,15 @@ dotnet build Gemuera.csproj
 
 ## 未解決の技術的課題
 
-1. **`Process.Run()` メソッド** — `MainNode.cs` が呼ぶが未実装。`Process.cs` に public な Run() ループを追加する必要あり
+1. **`Process.Run()` メソッド** — `MainNode.cs` が呼ぶが未実装。`Process.cs` に public な Run() ループを追加する必要あり（フェーズ 2 で実装予定）
 2. **`Process.RequestQuit()` メソッド** — 同様に未実装
-3. **`AppContents`** — 画像キャッシュ (`UI/Game/Image/AppContents.cs`)。`Process.cs` から参照されているが移植未着手
-4. **`Dialog` クラス** — `Config.cs` 等でスタブ化されているが一部残存している可能性あり
-5. **`MinorShift.Emuera.Sub` 名前空間** — `ErbLoader/ErhLoader` が参照しているが何者か未確認
+3. **`AppContents`** — `ImageStubs.cs` にスタブ実装済み。ただし実際の画像キャッシュ・デコードはフェーズ 6 で実装予定
+4. **`PrintStringBuffer`** — `EmueraConsole.cs` に `IsEmpty=true` のスタブのみ。本来の行バッファ管理はフェーズ 2 で実装予定
+5. **`EscapedParts`** — `Dictionary<long, List<AConsoleDisplayNode>>` の空実装。CBG/divパーツ表示はフェーズ 2/6 で実装予定
 6. **`CtrlZ`** — `Config.Config.Ctrl_Z_Enabled` を参照。Ctrl+Z機能はGodot版では後回し
 7. **ファイルアクセス** — Android/Web では `System.IO.File` が使えない。Phase 4 で対応予定
+8. **`Sound.isPlaying()`** — 常に `false` を返すスタブ。実際のサウンド再生はフェーズ 5 で実装予定
+9. **`IGameConsole.GetWindowTitle()`** — `Engine.GetVersionInfo()` を返すプレースホルダー。正式実装はフェーズ 2 で
 
 ---
 

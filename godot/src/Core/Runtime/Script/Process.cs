@@ -1,4 +1,5 @@
 ﻿using Gemuera.Bridge;
+using MinorShift.Emuera.GameView;
 using MinorShift.Emuera.Runtime.Config;
 using MinorShift.Emuera.Runtime.Script;
 using MinorShift.Emuera.Runtime.Script.Data;
@@ -10,6 +11,7 @@ using MinorShift.Emuera.Runtime.Script.Statements.Function;
 using MinorShift.Emuera.Runtime.Script.Statements.Variable;
 using MinorShift.Emuera.Runtime.Utils;
 using MinorShift.Emuera.Runtime.Utils.PluginSystem;
+using MinorShift.Emuera.UI.Game.Image;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -41,7 +43,9 @@ internal sealed partial class Process(IGameConsole view)
 	private ExpressionMediator exm;
 	private GameBase gamebase;
 	public GameBase gameBase { get { return gamebase; } }
-	readonly IGameConsole console = view;
+	readonly EmueraConsole console = new EmueraConsole(view);
+	/// <summary>The EmueraConsole adapter created for this Process instance.</summary>
+	public EmueraConsole Console => console;
 	private IdentifierDictionary idDic;
 	ProcessState state;
 	ProcessState originalState;//リセットする時のために
@@ -67,9 +71,7 @@ internal sealed partial class Process(IGameConsole view)
 			if (ParserMediator.HasWarning)
 			{
 				ParserMediator.FlushWarningList();
-				if (false;
-					return false;
-				}
+				// [Gemuera] Config error dialog suppressed — always continue
 			}
 			logWriter?.WriteLine($"Proc:Init:Parser:End {stopWatch.ElapsedMilliseconds}ms");
 
@@ -115,9 +117,7 @@ internal sealed partial class Process(IGameConsole view)
 					if (ParserMediator.HasWarning)
 					{
 						ParserMediator.FlushWarningList();
-						if (false;
-							return false;
-						}
+						// [Gemuera] Replace file error dialog suppressed — always continue
 					}
 				}
 			}
@@ -387,13 +387,9 @@ internal sealed partial class Process(IGameConsole view)
 		string text = string.Format(
 			trmb.TooLongLoop.Text,
 			currentLine.Position.Value.Filename, currentLine.Position.Value.LineNo, state.lineCount, elapsedTime);
-		if (false;
-		}
-		else
-		{
-			state.lineCount = 0;
-			startTime.Restart();
-		}
+		// [Gemuera] Infinite loop dialog suppressed — always reset state
+		state.lineCount = 0;
+		startTime.Restart();
 	}
 
 	int methodStack;
@@ -428,6 +424,14 @@ internal sealed partial class Process(IGameConsole view)
 		}
 		return ret;
 	}
+
+	// ---- External entry points called from MainNode ----
+
+	/// <summary>Start the ERA interpreter main loop. Blocks until the game exits.</summary>
+	public void Run() => DoScript();
+
+	/// <summary>Request the interpreter to stop at the next opportunity.</summary>
+	public void RequestQuit() => console.ForceQuit();
 
 	public void clearMethodStack()
 	{

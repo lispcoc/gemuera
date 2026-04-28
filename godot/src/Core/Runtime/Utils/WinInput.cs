@@ -6,4 +6,6 @@ internal static class WinInput
 {
     public static void SendKey(int keyCode) { /* no-op in Godot port */ }
     public static void SendString(string text) { /* no-op */ }
+    /// <summary>Stub: always returns 0 (key not pressed).</summary>
+    public static short GetKeyState(int keyCode) => 0;
 }

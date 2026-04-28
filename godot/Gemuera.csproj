@@ -12,6 +12,7 @@
   <!-- Shift-JIS support -->
   <ItemGroup>
     <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+    <PackageReference Include="Enums.NET" Version="4.0.2" />
   </ItemGroup>
 
   <!--

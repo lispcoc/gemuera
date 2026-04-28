@@ -1,3 +1,4 @@
+using MinorShift.Emuera.Runtime;
 using System.Threading.Tasks;
 
 // Bridge layer between the ERA interpreter core and the Godot UI.
@@ -11,7 +12,7 @@ namespace Gemuera.Bridge;
 /// All methods are expected to be called from the interpreter thread;
 /// implementations must ensure thread-safe dispatch to the UI thread.
 /// </summary>
-internal interface IGameConsole
+public interface IGameConsole
 {
     // ----------------------------------------------------------------
     // Output
@@ -94,15 +95,21 @@ internal interface IGameConsole
     /// <summary>TITLE — set the window / app title.</summary>
     void SetWindowTitle(string title);
 
+    /// <summary>Get the current window/app title.</summary>
+    string GetWindowTitle();
+
     /// <summary>Set the status bar text (bottom bar).</summary>
     void SetStatusBar(string text);
 
     // ----------------------------------------------------------------
     // State / Lifecycle
-    // ---------------------------------------------------------------->
+    // ----------------------------------------------------------------
+
+    /// <summary>Whether the interpreter should keep running.</summary>
+    bool IsRunning { get; }
 
     /// <summary>REDRAW — force an immediate display refresh.</summary>
-    void Redraw();
+    void DoRedraw();
 
     /// <summary>QUIT — signal that the interpreter wants to exit.</summary>
     void Quit();

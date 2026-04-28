@@ -3,6 +3,7 @@
 // Attach to Console.tscn root Control node.
 using Godot;
 using Gemuera.Bridge;
+using MinorShift.Emuera.Runtime;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -60,7 +61,7 @@ public partial class ConsoleNode : Control, IGameConsole
         _scroll    = GetNode<ScrollContainer>(ScrollContainerPath);
 
         _richText.BbcodeEnabled = true;
-        _richText.ScrollFollowingEnabled = true;
+        // ScrollFollowingEnabled is not available in Godot 4.3; scroll following is enabled by default
 
         _inputLine.TextSubmitted += OnInputSubmitted;
         _inputLine.Editable = false; // disabled until INPUT command
@@ -200,7 +201,7 @@ public partial class ConsoleNode : Control, IGameConsole
             // Handle timeout
             if (request.Timelimit > 0)
             {
-                var timer = new Timer(_ =>
+                var timer = new System.Threading.Timer(_ =>
                 {
                     var tcs = _inputTcs;
                     if (tcs != null && !tcs.Task.IsCompleted)
@@ -248,6 +249,8 @@ public partial class ConsoleNode : Control, IGameConsole
         Enqueue(() => DisplayServer.WindowSetTitle(title));
     }
 
+    public string GetWindowTitle() => Engine.GetVersionInfo().ToString();
+
     public void SetStatusBar(string text)
     {
         Enqueue(() => { if (_statusBar != null) _statusBar.Text = text; });
@@ -255,13 +258,17 @@ public partial class ConsoleNode : Control, IGameConsole
 
     // ---- State ----
 
-    public void Redraw()
+    private bool _isRunning = true;
+    public bool IsRunning => _isRunning;
+
+    public void DoRedraw()
     {
         Enqueue(() => QueueRedraw());
     }
 
     public void Quit()
     {
+        _isRunning = false;
         Enqueue(() => GetTree().Quit());
     }
 

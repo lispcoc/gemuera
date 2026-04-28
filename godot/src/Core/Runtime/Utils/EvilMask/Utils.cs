@@ -2,6 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Text;
 
@@ -46,7 +48,7 @@ internal sealed class Utils
 	internal sealed class StyledBoxModel
 	{
 		public MixedNum[] border, margin, padding, radius;
-		public int[] EraColor;
+		public int[] color;
 	}
 	static Stopwatch stopwatch = new();
 	static long stopwatch_base = DateTime.Now.Ticks;
@@ -247,8 +249,8 @@ internal sealed class Utils
 							bmp = (Bitmap)factory.Image;*/
 			if (Path.GetExtension(filepath).ToLower() == ".webp")
 			{
-				using WebP webp = new();
-				bmp = webp.Load(filepath);
+				// WebP not supported on Godot cross-platform builds — skip
+				return bmp;
 			}
 			else
 			{

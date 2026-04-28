@@ -1,6 +1,6 @@
 ﻿namespace MinorShift.Emuera.Runtime;
 
-enum InputType
+public enum InputType
 {
 	EnterKey = 1,//Enterキーかクリック
 	AnyKey = 2,//なんでもいいから入力
@@ -25,7 +25,7 @@ enum InputType
 // できるだけ間にクッションをおいていきたい。最終的には別スレッドに
 
 //クラスを毎回使い捨てるのはどうなんだろう 使いまわすべきか
-internal sealed class InputRequest
+public sealed class InputRequest
 {
 	public InputRequest()
 	{

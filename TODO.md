@@ -45,23 +45,31 @@ d:\Github\gemuera\
 
 ## フェーズ 1 — 基盤構築 ✅ 完了
 
+**`dotnet build` ビルド成功: 0 エラー / 0 警告** (2026-04-28 確認)
+
 - [x] コードベース調査・アーキテクチャ把握
 - [x] 移植計画書（本ファイル）作成
 - [x] Godotプロジェクト骨格作成 (`project.godot`, `Gemuera.csproj`, `Gemuera.sln`)
-- [x] `IGameConsole` インターフェース定義 (`src/Bridge/IGameConsole.cs`)
+- [x] `IGameConsole` インターフェース定義 (`src/Bridge/IGameConsole.cs`) — `GetWindowTitle()`含む
 - [x] `DisplayPackets.cs` — 表示データ型定義 (`StringStyle`, `InputResult`)
-- [x] `EraColor.cs` — System.Drawing.Color置換シム
-- [x] `Program.cs` — クロスプラットフォーム向けパス設定クラス
+- [x] `EraColor.cs` — System.Drawing.Color置換シム（`FromName()`含む）
+- [x] `DrawingCompat.cs` — `System.Drawing.*` 全域スタブ（Color/Font/Graphics/Pen/Brush/ColorMatrix/StringFormat/SizeF等）
+- [x] `Program.cs` — `ExeDir/CsvDir/ErbDir/SavDir/ContentDir/DatDir/SoundDir` パス設定
 - [x] `GlobalStatic.cs` — IGameConsole参照化、PrivateFontCollection除去
 - [x] コア移植: `InputRequest.cs`
 - [x] コア移植: `Runtime/Utils/` ポータブルファイル (SFMT, EncodingHandler等)
-- [x] コア移植: `Runtime/Utils/` Windowsスタブ (Sound, WebP, WinInput, WinmmTimer, Sys)
+- [x] コア移植: `Runtime/Utils/` Windowsスタブ (Sound メソッド化/setVolume追加, WebP, WinInput, WinmmTimer, Sys)
 - [x] コア移植: `Runtime/Config/` (System.Drawing → EraColor, WinForms除去)
 - [x] コア移植: `Runtime/Script/Data/` (全ファイル)
 - [x] コア移植: `Runtime/Script/Parser/` (全ファイル)
 - [x] コア移植: `Runtime/Script/Loader/` (EmueraConsole → IGameConsole)
-- [x] コア移植: `Runtime/Script/Statements/` (全ファイル)
+- [x] コア移植: `Runtime/Script/Statements/` (全ファイル、MessageBox/DialogResult除去等)
 - [x] コア移植: `Process*.cs` — EmueraConsole → IGameConsole差し替え
+- [x] `GameView/EmueraConsole.cs` — IGameConsoleラッパー（PrintBuffer/EscapedParts/Await/LineCount/IsTimeOut等含む）
+- [x] `GameView/UIGameTypes.cs` — HtmlManagerスタブ (HtmlLength/HtmlSubString等)
+- [x] `GameView/ImageStubs.cs` — AbstractImage/GraphicsImage/ASprite/AppContentsスタブ
+- [x] `PluginSystem/PluginManager.cs` — シングルトン、HasMethod/GetMethodスタブ
+- [x] `PluginSystem/IPluginMethod.cs` — PluginMethodParameterBuilderスタブ追加
 - [x] Godot UIスタブ: `ConsoleNode.cs` (RichTextLabel + LineEdit)
 - [x] Godot UIスタブ: `MainNode.cs` (インタープリター起動・管理)
 - [x] Godotシーン: `Main.tscn`, `Console.tscn`

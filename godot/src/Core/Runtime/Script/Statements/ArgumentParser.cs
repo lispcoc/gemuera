@@ -1,4 +1,4 @@
-﻿using MinorShift.Emuera.Runtime.Script.Statements;
+using MinorShift.Emuera.Runtime.Script.Statements;
 using MinorShift.Emuera.Runtime.Utils;
 
 namespace MinorShift.Emuera.GameProc.Function;
@@ -50,7 +50,7 @@ internal static partial class ArgumentParser
 
 		static bool error(InstructionLine line, string errmes)
 		{
-			System.Media.SystemSounds.Hand.Play();
+			/* SystemSounds — no-op on non-Windows */
 
 			line.IsError = true;
 			line.ErrMes = errmes;

@@ -1,5 +1,7 @@
 ﻿using Gemuera.Bridge;
+using MinorShift.Emuera.GameView;
 using MinorShift.Emuera.GameData.Variable;
+using MinorShift.Emuera.UI.Game.Image;
 using trerror = MinorShift.Emuera.Runtime.Utils.EvilMask.Lang.Error;
 using trsl = MinorShift.Emuera.Runtime.Utils.EvilMask.Lang.SystemLine;
 using System.Diagnostics;
@@ -89,12 +91,12 @@ internal enum BeginType
 
 internal sealed class ProcessState
 {
-	public ProcessState(IGameConsole console)
+	public ProcessState(EmueraConsole console)
 	{
 		if (Program.DebugMode)//DebugModeでなければ知らなくて良い
 			this.console = console;
 	}
-	readonly IGameConsole console;
+	readonly EmueraConsole console;
 	readonly List<CalledFunction> functionList = [];
 	private LogicalLine currentLine;
 	//private LogicalLine nextLine;

@@ -15,6 +15,15 @@ internal struct EraColor : System.IEquatable<EraColor>
     public static EraColor FromArgb(int a, int r, int g, int b) =>
         new EraColor((a << 24) | (r << 16) | (g << 8) | b);
 
+    /// <summary>Resolve a CSS/HTML color name.  Returns EraColor.Empty if unknown.</summary>
+    public static EraColor FromName(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return Empty;
+        var c = System.Drawing.Color.FromName(name);
+        if (c.IsEmpty) return Empty;
+        return new EraColor(c.ToArgb());
+    }
+
     public int ToArgb() => _argb;
 
     public byte A => (byte)((_argb >> 24) & 0xFF);
@@ -34,6 +43,7 @@ internal struct EraColor : System.IEquatable<EraColor>
     public static readonly EraColor Blue    = FromArgb(0, 0, 255);
     public static readonly EraColor Cyan    = FromArgb(0, 255, 255);
     public static readonly EraColor Magenta = FromArgb(255, 0, 255);
+    public static readonly EraColor Transparent = new EraColor(0);
 
     public bool IsEmpty => _argb == 0;
 

@@ -1,5 +1,6 @@
 ﻿using Gemuera.Bridge;
 using MinorShift.Emuera.GameData.Variable;
+using MinorShift.Emuera.GameView;
 using MinorShift.Emuera.Runtime.Config.JSON;
 using MinorShift.Emuera.Runtime.Script.Data;
 using MinorShift.Emuera.Runtime.Script.Statements.Expression;
@@ -1548,7 +1549,7 @@ internal sealed class VariableEvaluator : IDisposable
 	//PREVCOMは更新されない。スクリプトの方で更新する必要がある。
 	//Data側からEmueraConsoleを操作するのはここだけ。
 	//1756 ↑だったのは今は昔の話である
-	public void UpdateInUpcheck(IGameConsole window, bool skipPrint)
+	public void UpdateInUpcheck(EmueraConsole window, bool skipPrint)
 	{
 		long[] up, down, param;
 		string[] paramname = constant.GetCsvNameList(VariableCode.PALAMNAME);
@@ -1604,7 +1605,7 @@ internal sealed class VariableEvaluator : IDisposable
 			down[i] = 0;
 	}
 
-	public void CUpdateInUpcheck(IGameConsole window, long target, bool skipPrint)
+	public void CUpdateInUpcheck(EmueraConsole window, long target, bool skipPrint)
 	{
 		long[] up, down, param;
 		string[] paramname = constant.GetCsvNameList(VariableCode.PALAMNAME);
@@ -1791,7 +1792,7 @@ internal sealed class VariableEvaluator : IDisposable
 		}
 		catch
 		{
-			MessageBox.Show(trerror.FailedCreateDataFolder.Text);
+			// MessageBox not available on Godot cross-platform targets
 			throw new CodeEE(trerror.FailedCreateDataFolder.Text);
 		}
 	}

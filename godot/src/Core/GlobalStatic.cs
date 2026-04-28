@@ -1,7 +1,8 @@
 // Gemuera adaptation of GlobalStatic.cs
 // Removes PrivateFontCollection (System.Drawing.Text) — Godot manages fonts.
-// IGameConsole replaces direct EmueraConsole reference.
-using Gemuera.Bridge;
+// EmueraConsole wraps IGameConsole; Process constructs it internally.
+using MinorShift.Emuera.GameData.Variable;
+using MinorShift.Emuera.GameView;
 using MinorShift.Emuera.Runtime.Script.Data;
 using MinorShift.Emuera.Runtime.Script.Statements;
 using MinorShift.Emuera.Runtime.Script.Statements.Variable;
@@ -15,7 +16,7 @@ internal static class GlobalStatic
     // Initialisation order: from top (created first) to bottom (created last).
     // A field lower in the list may return null if accessed before creation.
 
-    public static IGameConsole Console;
+    public static EmueraConsole Console;
     public static GameProc.Process Process;
     public static Runtime.Script.Data.GameBase GameBaseData;
     public static ConstantData ConstantData;
@@ -31,6 +32,9 @@ internal static class GlobalStatic
     public static bool ForceQuitAndRestart;
 
     public static CtrlZ ctrlZ = new();
+
+    // PrivateFontCollection stub — font loading is managed by Godot, not GDI+.
+    public static System.Drawing.Text.PrivateFontCollection Pfc = new();
 
 #if DEBUG
     public static System.Collections.Generic.List<Runtime.Script.Statements.FunctionLabelLine> StackList = [];

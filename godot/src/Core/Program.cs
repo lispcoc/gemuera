@@ -30,6 +30,19 @@ internal static class Program
     /// <summary>Debug mode flag.</summary>
     public static bool DebugMode { get; private set; } = false;
 
+    /// <summary>Content (resources) directory.</summary>
+    public static string ContentDir { get; private set; } = "";
+    public static string SoundDir { get; private set; } = "";
+
+    /// <summary>Variable data directory (for KDMM-format .dat saves).</summary>
+    public static string DatDir { get; private set; } = "";
+
+    /// <summary>Reboot flag — set by QUIT_AND_RESTART instruction.</summary>
+    public static bool rebootFlag;
+
+    /// <summary>Files to analyse in AnalysisMode (null outside analysis mode).</summary>
+    public static System.Collections.Generic.List<string> AnalysisFiles;
+
     /// <summary>
     /// Must be called by the Godot UI layer before creating Process.
     /// </summary>
@@ -40,9 +53,12 @@ internal static class Program
         ExeDir    = root;
         CsvDir    = root + "csv"  + Path.DirectorySeparatorChar;
         ErbDir    = root + "erb"  + Path.DirectorySeparatorChar;
-        SavDir    = root + "sav"  + Path.DirectorySeparatorChar;
-        DebugDir  = root + "debug"+ Path.DirectorySeparatorChar;
-        DebugMode = debugMode;
+        SavDir      = root + "sav"   + Path.DirectorySeparatorChar;
+        DebugDir    = root + "debug" + Path.DirectorySeparatorChar;
+        ContentDir  = root + "resources" + Path.DirectorySeparatorChar;
+        DatDir      = root + "dat"       + Path.DirectorySeparatorChar;
+        SoundDir    = root + "sound"     + Path.DirectorySeparatorChar;
+        DebugMode   = debugMode;
         AnalysisMode = analysisMode;
 
         // Register Shift-JIS encoding provider (needed for legacy ERA files)

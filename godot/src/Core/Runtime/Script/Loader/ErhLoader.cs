@@ -1,6 +1,7 @@
-﻿using Gemuera.Bridge;
+using Gemuera.Bridge;
 using MinorShift.Emuera.GameData.Variable;
 using MinorShift.Emuera.GameProc;
+using MinorShift.Emuera.GameView;
 using MinorShift.Emuera.Runtime.Script.Data;
 using MinorShift.Emuera.Runtime.Script.Parser;
 using MinorShift.Emuera.Runtime.Utils;
@@ -15,14 +16,14 @@ namespace MinorShift.Emuera.Runtime.Script.Loader;
 
 internal sealed class ErhLoader
 {
-	public ErhLoader(IGameConsole main, IdentifierDictionary idDic, Process proc)
+	public ErhLoader(EmueraConsole main, IdentifierDictionary idDic, Process proc)
 	{
 		output = main;
 		parentProcess = proc;
 		this.idDic = idDic;
 	}
 	readonly Process parentProcess;
-	readonly IGameConsole output;
+	readonly EmueraConsole output;
 	readonly IdentifierDictionary idDic;
 
 	bool noError = true;
@@ -300,7 +301,7 @@ internal sealed class ErhLoader
 								var info = erdFileNames[key];
 								GlobalStatic.ConstantData.UserDefineLoadData(info, data.Name, data.Lengths[0], Config.Config.DisplayReport, dimline.SC);
 							}
-							System.Windows.Forms.Application.DoEvents();
+							/* DoEvents — no-op on non-Windows */
 						}
 						else if (data.Dimension == 2)
 						{
@@ -312,7 +313,7 @@ internal sealed class ErhLoader
 									var info = erdFileNames[key];
 									GlobalStatic.ConstantData.UserDefineLoadData(info, data.Name + "@" + dim, data.Lengths[dim - 1], Config.Config.DisplayReport, dimline.SC);
 								}
-								System.Windows.Forms.Application.DoEvents();
+								/* DoEvents — no-op on non-Windows */
 							}
 						}
 						else if (data.Dimension == 3)
@@ -325,7 +326,7 @@ internal sealed class ErhLoader
 									var info = erdFileNames[key];
 									GlobalStatic.ConstantData.UserDefineLoadData(info, data.Name + "@" + dim, data.Lengths[dim - 1], Config.Config.DisplayReport, dimline.SC);
 								}
-								System.Windows.Forms.Application.DoEvents();
+								/* DoEvents — no-op on non-Windows */
 							}
 						}
 					}

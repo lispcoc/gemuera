@@ -11,12 +11,14 @@ using MinorShift.Emuera.Runtime.Script.Statements.Function;
 using MinorShift.Emuera.Runtime.Script.Statements.Variable;
 using MinorShift.Emuera.Runtime.Utils;
 using MinorShift.Emuera.Runtime.Utils.EvilMask;
+using MixedNum = MinorShift.Emuera.Runtime.Utils.EvilMask.Utils.MixedNum;
 using MinorShift.Emuera.Runtime.Utils.PluginSystem;
 using MinorShift.Emuera.UI.Game;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Drawing;
 using System.Net;
 using System.Text;
 using static MinorShift.Emuera.Runtime.Utils.EvilMask.Utils;
@@ -1579,7 +1581,7 @@ internal sealed partial class FunctionIdentifier
 			{
 				opacity = long.Parse(arg.TermList[2].GetStrValue(exm)) / 255.0f;
 			}
-			exm.Console.AddBackgroundImage(bgName, bgDepth, opacity);
+			exm.Console.AddBackgroundImage(bgName, (int)bgDepth, (int)(opacity * 255));
 		}
 	}
 	private sealed class REMOVEBGIMAGE_Instruction : AInstruction
@@ -2875,13 +2877,9 @@ internal sealed partial class FunctionIdentifier
 					}
 					if (version != GlobalStatic.GameBaseData.VersionName)
 					{
-						DialogResult result = MessageBox.Show(string.Format(trmb.NewVersionAvailable.Text, version, link),
-							trmb.UpdateCheck.Text,
-							MessageBoxButtons.YesNo,
-							MessageBoxIcon.None,
-							MessageBoxDefaultButton.Button2
-							);
-						if (result == DialogResult.Yes)
+						// MessageBox not available on non-Windows; auto-skip update prompt
+						bool result = false;
+						if (result)
 						{
 							exm.VEvaluator.RESULT = 2;
 							System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
@@ -2956,7 +2954,7 @@ internal sealed partial class FunctionIdentifier
 		public override void DoInstruction(ExpressionMediator exm, InstructionLine func, ProcessState state)
 		{
 			ExpressionArgument fs = (ExpressionArgument)func.Argument;
-			exm.Console.SetToolTipFontSize(fs.Term.GetIntValue(exm));
+			exm.Console.SetToolTipFontSize((int)fs.Term.GetIntValue(exm));
 		}
 	}
 	private sealed class TOOLTIP_CUSTOM_Instruction : AInstruction

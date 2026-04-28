@@ -1,6 +1,7 @@
-﻿using Gemuera.Bridge;
+using Gemuera.Bridge;
 using MinorShift.Emuera.GameProc;
 using MinorShift.Emuera.GameProc.Function;
+using MinorShift.Emuera.GameView;
 using MinorShift.Emuera.Runtime.Config;
 using MinorShift.Emuera.Runtime.Config.JSON;
 using MinorShift.Emuera.Runtime.Script.Data;
@@ -21,7 +22,7 @@ namespace MinorShift.Emuera.Runtime.Script.Loader;
 
 internal sealed class ErbLoader
 {
-	public ErbLoader(IGameConsole main, ExpressionMediator exm, Process proc)
+	public ErbLoader(EmueraConsole main, ExpressionMediator exm, Process proc)
 	{
 		output = main;
 		parentProcess = proc;
@@ -29,7 +30,7 @@ internal sealed class ErbLoader
 	}
 	readonly Process parentProcess;
 	readonly ExpressionMediator exm;
-	readonly IGameConsole output;
+	readonly EmueraConsole output;
 	readonly HashSet<string> ignoredFNFWarningFiles = new(StringComparer.OrdinalIgnoreCase);
 	int ignoredFNFWarningCount;
 
@@ -124,7 +125,7 @@ internal sealed class ErbLoader
 		catch (Exception e)
 		{
 			ParserMediator.FlushWarningList();
-			System.Media.SystemSounds.Hand.Play();
+			/* SystemSounds.Hand.Play — no-op on non-Windows */
 			output.PrintError(string.Format(trerror.UnexpectedErrorFrom.Text, AssemblyData.EmueraVersionText));
 			output.PrintError(e.GetType().ToString() + ":" + e.Message);
 			return false;
@@ -522,7 +523,7 @@ internal sealed class ErbLoader
 			}
 			catch (Exception exc)
 			{
-				System.Media.SystemSounds.Hand.Play();
+				/* SystemSounds.Hand.Play — no-op on non-Windows */
 				string errmes = exc.Message;
 				if (!(exc is EmueraException))
 					errmes = exc.GetType().ToString() + ":" + errmes;
@@ -888,12 +889,12 @@ internal sealed class ErbLoader
 		}
 		catch (Exception exc)
 		{
-			System.Media.SystemSounds.Hand.Play();
+			/* SystemSounds.Hand.Play — no-op on non-Windows */
 			//1756beta2+v6.1 修正の効率化のために何かパース関係でハンドリングできてないエラーが出た場合はスタックトレースを投げるようにした
 			string errmes = exc is EmueraException ? exc.Message : exc.GetType().ToString() + ":" + exc.Message;
 			ParserMediator.Warn(string.Format(trerror.FuncAnalysisError.Text, label.LabelName, errmes), label, 2, true, false, exc is not EmueraException ? exc.StackTrace : null);
 			label.ErrMes = trerror.CalledFailedFunc.Text;
-			System.Windows.Forms.Application.DoEvents();
+			/* Application.DoEvents — no-op on non-Windows */
 		}
 		finally
 		{

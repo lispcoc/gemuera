@@ -1,8 +1,9 @@
-﻿using MinorShift.Emuera.Runtime;
+using MinorShift.Emuera.Runtime;
 using MinorShift.Emuera.Runtime.Config;
 using MinorShift.Emuera.Runtime.Script;
 using MinorShift.Emuera.Runtime.Utils;
 using MinorShift.Emuera.UI.Game;
+using MinorShift.Emuera.UI.Game.Image;
 using System;
 using System.Collections.Generic;
 using trerror = MinorShift.Emuera.Runtime.Utils.EvilMask.Lang.Error;
@@ -185,7 +186,7 @@ internal sealed partial class Process
 			#endregion
 			console.noOutputLog = true;
 			console.PrintSystemLine(trsl.PressEnterOrClick.Text);
-			System.Media.SystemSounds.Asterisk.Play();
+			/* SystemSounds — no-op on non-Windows */
 			console.ThrowTitleError(false);
 			return;
 		}
@@ -200,7 +201,7 @@ internal sealed partial class Process
 			#endregion
 			console.noOutputLog = true;
 			console.PrintSystemLine(trsl.PressEnterOrClick.Text);
-			System.Media.SystemSounds.Asterisk.Play();
+			/* SystemSounds — no-op on non-Windows */
 			console.ThrowTitleError(true);
 			return;
 		}

@@ -3,6 +3,7 @@
 using Godot;
 using Gemuera.Bridge;
 using MinorShift.Emuera;
+using MinorShift.Emuera.GameView;
 using System.Threading.Tasks;
 
 namespace Gemuera.UI;
@@ -59,12 +60,10 @@ public partial class MainNode : Node
         MinorShift.Emuera.Runtime.Config.Config.SetConfig(
             MinorShift.Emuera.Runtime.Config.ConfigData.Instance);
 
-        // 3. Register console in GlobalStatic
-        GlobalStatic.Console = _console;
-
-        // 4. Create and initialise the interpreter
+        // 3. Create and initialise the interpreter (EmueraConsole is created inside Process)
         _process = new MinorShift.Emuera.GameProc.Process(_console);
-        GlobalStatic.Process = _process;
+        GlobalStatic.Process  = _process;
+        GlobalStatic.Console  = _process.Console;  // the EmueraConsole adapter
 
         bool ok = await _process.Initialize(null);
         if (!ok)

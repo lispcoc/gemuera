@@ -9,6 +9,8 @@ using MinorShift.Emuera.Runtime.Script.Statements.Variable;
 using MinorShift.Emuera.Runtime.Utils;
 using MinorShift.Emuera.Runtime.Utils.EvilMask;
 using MinorShift.Emuera.UI.Game;
+using MinorShift.Emuera.UI.Game.Image;
+using System.Drawing;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -2404,27 +2406,8 @@ internal static partial class FunctionMethodCreator
 		public override long GetIntValue(ExpressionMediator exm, List<AExpression> arguments)
 		{
 			string str = arguments[0].GetStrValue(exm);
-			using System.Drawing.Text.InstalledFontCollection ifc = new();
-			long isInstalled = 0;
-			foreach (FontFamily ff in ifc.Families)
-			{
-				#region EE_フォントファイル対応
-				if (ff.Name == str)
-				{
-					isInstalled = 1;
-					break;
-				}
-			}
-			foreach (FontFamily ff in GlobalStatic.Pfc.Families)
-			{
-				if (ff.Name == str)
-				{
-					isInstalled = 1;
-					break;
-				}
-			}
-			#endregion
-			return (isInstalled);
+			// Godot manages fonts; font detection always returns 0 on non-Windows.
+			return 0;
 		}
 
 	}
@@ -2579,7 +2562,7 @@ internal static partial class FunctionMethodCreator
 		public override long GetIntValue(ExpressionMediator exm, List<AExpression> arguments)
 		{
 			EraColor color = defaultColor ? Config.ForeColor : GlobalStatic.Console.StringStyle.Color;
-			return EraColor.ToArgb() & 0xFFFFFF;
+			return color.ToArgb() & 0xFFFFFF;
 		}
 	}
 
@@ -2611,7 +2594,7 @@ internal static partial class FunctionMethodCreator
 		public override long GetIntValue(ExpressionMediator exm, List<AExpression> arguments)
 		{
 			EraColor color = defaultColor ? Config.BackColor : GlobalStatic.Console.bgColor;
-			return EraColor.ToArgb() & 0xFFFFFF;
+			return color.ToArgb() & 0xFFFFFF;
 		}
 	}
 
@@ -2717,8 +2700,8 @@ internal static partial class FunctionMethodCreator
 			string colorName = arguments[0].GetStrValue(exm);
 			EraColor color = EraColor.FromName(colorName);
 			int i;
-			if (EraColor.A > 0)
-				i = (EraColor.R << 16) + (EraColor.G << 8) + EraColor.B;
+			if (color.A > 0)
+				i = (color.R << 16) + (color.G << 8) + color.B;
 			else
 			{
 				if (colorName.Equals("transparent", StringComparison.OrdinalIgnoreCase))
@@ -5324,9 +5307,9 @@ internal static partial class FunctionMethodCreator
 					return g.Height;
 				#region EE_GDRAWTEXTに付随する要素
 				case "GGETFONTSIZE":
-					return g.Fontsize;
+					return (long)g.Fontsize;
 				case "GGETFONTSTYLE":
-					return g.Fontstyle;
+					return (long)g.Fontstyle;
 				case "GGETPEN":
 					return g.Pen.EraColor.ToArgb() & 0xffffffffL;
 				case "GGETPENWIDTH":
@@ -5491,7 +5474,7 @@ internal static partial class FunctionMethodCreator
 				{
 					if (ff.Name == fontname)
 					{
-						styledFont = new Font(ff, fontsize, fs, GraphicsUnit.Pixel);
+						styledFont = new Font(ff.Name, fontsize, fs, GraphicsUnit.Pixel);
 						goto foundfont;
 					}
 				}
@@ -6836,7 +6819,7 @@ internal static partial class FunctionMethodCreator
 			//if (exm.Console.SelectingButton != null)
 			//	return exm.Console.SelectingButton.ToString();
 			bool b = exm.Console.AlwaysRefresh;
-			Point point = exm.Console.Window.MainPicBox.PointToClient(Control.MousePosition);
+			Point point = exm.Console.Window.MainPicBox.PointToClient(Point.Empty /* Control.MousePosition not available */);
 			exm.Console.AlwaysRefresh = true;
 			if (exm.Console.Window.MainPicBox.ClientRectangle.Contains(point))
 				exm.Console.MoveMouse(point);

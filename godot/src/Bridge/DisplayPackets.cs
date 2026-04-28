@@ -10,7 +10,7 @@ namespace Gemuera.Bridge;
 /// Replaces the original StringStyle / ConsoleStyledString colour logic.
 /// </summary>
 [System.Flags]
-internal enum TextStyleFlags
+public enum TextStyleFlags
 {
     Normal   = 0,
     Bold     = 1 << 0,
@@ -22,7 +22,7 @@ internal enum TextStyleFlags
 /// <summary>
 /// Complete style descriptor for a single text span.
 /// </summary>
-internal sealed class StringStyle
+public sealed class StringStyle
 {
     public TextStyleFlags Flags;
     /// <summary>Foreground color, packed ARGB. -1 = use default.</summary>
@@ -42,7 +42,7 @@ internal sealed class StringStyle
 /// <summary>
 /// Result returned by IGameConsole.RequestInputAsync().
 /// </summary>
-internal sealed class InputResult
+public sealed class InputResult
 {
     /// <summary>The raw string typed/selected by the user. Null on timeout.</summary>
     public string Value;

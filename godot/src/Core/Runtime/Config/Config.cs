@@ -245,8 +245,6 @@ internal static class Config
 	}
 	#endregion
 
- }
-
 
 	/// <summary>
 	/// ディレクトリ作成失敗のExceptionは呼び出し元で処理すること
@@ -289,7 +287,7 @@ internal static class Config
 		#endregion
 		if (!existGlobal && savFiles.Length == 0)
 			return;
-		var result = false
+		var result = false;
 		if (result == false)
 			return;
 		//ダイアログが開いている間にフォルダを消してしまうような邪悪なユーザーがいるかもしれない
