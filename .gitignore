@@ -7,11 +7,11 @@ godot/.godot/
 
 # Godot export outputs
 godot/export/
+dist/
 *.pck
 *.apk
 *.aab
 *.ipa
-*.exe
 *.x86_64
 *.arm64
 godot/.mono/
@@ -61,6 +61,23 @@ ehthumbs.db
 
 *.diff
 *.patch
+
+# ===========================
+# Runtime / log files
+# ===========================
+
+*.log
+gemuera_runtime.log
+gemuera_init.log
+build_errors.txt
+build_errors_only.txt
+build_web_error.txt
+
+# ===========================
+# Godot export preset (machine-specific, generated in editor)
+# ===========================
+
+godot/export_presets.cfg
 
 # ===========================
 # ERA game data (optional: uncomment if game files should not be committed)

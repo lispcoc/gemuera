@@ -1286,6 +1286,8 @@ internal sealed class ConstantData
 		SaveMaps.Clear();
 		StaticMaps.Clear();
 		StaticXmls.Clear();
+		// [Gemuera] Skip silently if the CSV directory does not exist yet.
+		if (!System.IO.Directory.Exists(csvPath)) return;
 		foreach (var path in Directory.GetFiles(csvPath, "VarExt*.csv", SearchOption.AllDirectories))
 		{
 			using var eReader = new EraStreamReader(false);

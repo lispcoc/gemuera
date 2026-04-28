@@ -58,6 +58,20 @@ internal sealed partial class Process(IGameConsole view)
 	{
 		var stopWatch = new Stopwatch();
 		stopWatch.Start();
+
+		// [Gemuera] Pre-flight: verify the ERB/CSV directories exist so we get a
+		// friendly message instead of a crash when no game files are present.
+		if (!System.IO.Directory.Exists(Program.ErbDir) || !System.IO.Directory.Exists(Program.CsvDir))
+		{
+			console.PrintSystemLine(
+				$"[Gemuera] ゲームファイルが見つかりません。\n" +
+				$"  ERB: {Program.ErbDir}\n" +
+				$"  CSV: {Program.CsvDir}\n" +
+				$"ゲームファイルを上記フォルダに配置してください。");
+			logWriter?.WriteLine($"Proc:Init:ABORT — missing game directories ERB={Program.ErbDir}  CSV={Program.CsvDir}");
+			return false;
+		}
+
 		LexicalAnalyzer.UseMacro = false;
 		state = new ProcessState(console);
 		originalState = state;
@@ -219,6 +233,8 @@ internal sealed partial class Process(IGameConsole view)
 		}
 		catch (Exception e)
 		{
+			logWriter?.WriteLine($"Proc:Init:EXCEPTION {stopWatch.ElapsedMilliseconds}ms  {e.GetType().Name}: {e.Message}");
+			logWriter?.WriteLine(e.StackTrace);
 			handleException(e, null, true);
 			console.PrintSystemLine(trsl.ErhLoadingError.Text);
 			return false;
