@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using System.Text;
+using EraConfig = MinorShift.Emuera.Runtime.Config.Config;
 
 namespace Gemuera.UI;
 
@@ -49,6 +50,9 @@ public partial class ConsoleNode : Control, IGameConsole
     private int _bgArgb = unchecked((int)0xFF000000);
     private TextStyleFlags _styleFlags = TextStyleFlags.Normal;
 
+    // Font size (updated by ApplyConfigFont; used for char-width estimation)
+    private int _fontSize = 18;
+
     // Current input request
     private TaskCompletionSource<InputResult> _inputTcs;
     private InputRequest _pendingRequest;
@@ -68,7 +72,7 @@ public partial class ConsoleNode : Control, IGameConsole
         _scroll    = GetNode<ScrollContainer>(ScrollContainerPath);
 
         _richText.BbcodeEnabled = true;
-        // ScrollFollowingEnabled is not available in Godot 4.3; scroll following is enabled by default
+        // scroll_following = true is set in Console.tscn so the view follows new output.
 
         _inputLine.TextSubmitted += OnInputSubmitted;
         _inputLine.Editable = false; // disabled until INPUT command
@@ -92,7 +96,7 @@ public partial class ConsoleNode : Control, IGameConsole
         }
     }
 
-    // Accept any key press for WAIT / WAITANYKEY
+    // Accept any key press for WAIT / WAITANYKEY / INPUTMOUSEKEY
     public override void _UnhandledKeyInput(InputEvent @event)
     {
         if (@event is InputEventKey key && key.Pressed && !key.Echo)
@@ -107,6 +111,19 @@ public partial class ConsoleNode : Control, IGameConsole
                     _inputLine.Editable = false;
                     _inputLine.PlaceholderText = "入力してEnterキー / Type and press Enter";
                     tcs.TrySetResult(new InputResult { Value = key.Keycode.ToString() });
+                }
+                else if (req.InputType == InputType.PrimitiveMouseKey)
+                {
+                    // type=4: keyboard key press during INPUTMOUSEKEY
+                    GetViewport().SetInputAsHandled();
+                    _inputLine.Editable = false;
+                    tcs.TrySetResult(new InputResult
+                    {
+                        MouseType   = 4,
+                        MouseButton = 0,
+                        MouseX      = (int)_lastMousePos.X,
+                        MouseY      = (int)_lastMousePos.Y,
+                    });
                 }
             }
         }
@@ -142,9 +159,10 @@ public partial class ConsoleNode : Control, IGameConsole
         char ch = (lineChar?.Length > 0) ? lineChar[0] : '-';
         Enqueue(() =>
         {
-            // Approximate character count from pixel width (assume ~10px per char at 18px font)
             int px = (int)_richText.Size.X;
-            int count = px > 0 ? System.Math.Max(20, px / 10) : 60;
+            // Half-width char width ≈ half the font size (monospace CJK assumption)
+            int charWidth = System.Math.Max(6, _fontSize / 2);
+            int count = px > 0 ? System.Math.Max(20, px / charWidth) : 60;
             string ruleBb = $"[color=#888888]{new string(ch, count)}[/color]\n";
             _richText.AppendText(ruleBb);
         });
@@ -398,6 +416,13 @@ public partial class ConsoleNode : Control, IGameConsole
                     _inputLine.GrabFocus();
                     break;
 
+                case InputType.PrimitiveMouseKey:
+                    // INPUTMOUSEKEY — wait for next mouse click, scroll, or key press.
+                    // The text box is NOT used; input is captured in _Input / _UnhandledKeyInput.
+                    _inputLine.PlaceholderText = "クリックまたはキー入力 / Click or press any key";
+                    _inputLine.Editable = false;
+                    break;
+
                 case InputType.Void:
                     // Cannot accept input — we still need to unblock eventually.
                     // Complete immediately (no variable will be set).
@@ -506,7 +531,54 @@ public partial class ConsoleNode : Control, IGameConsole
     public override void _Input(InputEvent @event)
     {
         if (@event is InputEventMouseMotion mm)
+        {
             _lastMousePos = mm.Position;
+            return;
+        }
+
+        // PrimitiveMouseKey — capture mouse button press or scroll wheel
+        var req = _pendingRequest;
+        var tcs = _inputTcs;
+        if (req?.InputType == InputType.PrimitiveMouseKey && tcs != null && !tcs.Task.IsCompleted)
+        {
+            if (@event is InputEventMouseButton mb && mb.Pressed)
+            {
+                GetViewport().SetInputAsHandled();
+                _inputLine.Editable = false;
+
+                int type, button, count;
+                if (mb.ButtonIndex == MouseButton.WheelUp || mb.ButtonIndex == MouseButton.WheelDown
+                    || mb.ButtonIndex == MouseButton.WheelLeft || mb.ButtonIndex == MouseButton.WheelRight)
+                {
+                    // type=2: scroll wheel; button = delta (+1 up, -1 down)
+                    type = 2;
+                    button = (mb.ButtonIndex == MouseButton.WheelUp || mb.ButtonIndex == MouseButton.WheelLeft) ? 1 : -1;
+                    count = 0;
+                }
+                else
+                {
+                    // type=1: mouse button; Windows MouseButtons: Left=1, Right=2, Middle=4
+                    type = 1;
+                    button = mb.ButtonIndex switch
+                    {
+                        MouseButton.Left   => 1,
+                        MouseButton.Right  => 2,
+                        MouseButton.Middle => 4,
+                        _                  => 0,
+                    };
+                    count = 1; // one button pressed
+                }
+
+                tcs.TrySetResult(new InputResult
+                {
+                    MouseType        = type,
+                    MouseButton      = button,
+                    MouseX           = (int)mb.Position.X,
+                    MouseY           = (int)mb.Position.Y,
+                    MouseButtonCount = count,
+                });
+            }
+        }
     }
 
     public void DoRedraw()
@@ -538,6 +610,48 @@ public partial class ConsoleNode : Control, IGameConsole
     // ----------------------------------------------------------------
     // BBCode helpers
     // ----------------------------------------------------------------
+
+    // ----------------------------------------------------------------
+    // Font configuration (called from MainNode after config is loaded)
+    // ----------------------------------------------------------------
+
+    /// <summary>
+    /// Apply font face and size from the loaded ERA config to the RichTextLabel and InputLine.
+    /// Must be called on the Godot main thread after <see cref="EraConfig"/> is populated.
+    /// </summary>
+    public void ApplyConfigFont()
+    {
+        int fontSize = EraConfig.FontSize;
+        string fontName = EraConfig.FontName ?? "MS Gothic";
+        _fontSize = fontSize;
+
+        // Build a SystemFont that tries the configured face name then common CJK fallbacks.
+        var sysFont = new SystemFont();
+        sysFont.FontNames = new string[]
+        {
+            fontName,
+            "MS Gothic",        // Windows CJK monospace ("ＭＳ ゴシック")
+            "Yu Gothic",        // Windows 10+ CJK proportional
+            "Noto Sans CJK JP", // Linux / Android
+            "Noto Sans JP",
+        };
+
+        // Apply to the output area
+        _richText.AddThemeFontOverride("normal_font",          sysFont);
+        _richText.AddThemeFontOverride("bold_font",            sysFont);
+        _richText.AddThemeFontOverride("italics_font",         sysFont);
+        _richText.AddThemeFontOverride("bold_italics_font",    sysFont);
+        _richText.AddThemeFontOverride("mono_font",            sysFont);
+        _richText.AddThemeFontSizeOverride("normal_font_size",       fontSize);
+        _richText.AddThemeFontSizeOverride("bold_font_size",         fontSize);
+        _richText.AddThemeFontSizeOverride("italic_font_size",       fontSize);
+        _richText.AddThemeFontSizeOverride("bold_italic_font_size",  fontSize);
+        _richText.AddThemeFontSizeOverride("mono_font_size",         fontSize);
+
+        // Apply to the input field
+        _inputLine.AddThemeFontOverride("font", sysFont);
+        _inputLine.AddThemeFontSizeOverride("font_size", fontSize);
+    }
 
     private static string ToBbcode(string text, StringStyle style)
     {

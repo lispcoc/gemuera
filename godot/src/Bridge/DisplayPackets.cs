@@ -62,6 +62,29 @@ public sealed class InputResult
     public int MouseX;
     /// <summary>Mouse Y position in console coordinates (if IsMouse).</summary>
     public int MouseY;
+
+    // ---- INPUTMOUSEKEY (PrimitiveMouseKey) fields ----
+    /// <summary>
+    /// INPUTMOUSEKEY event type:
+    ///   0 = timeout / none
+    ///   1 = mouse button press
+    ///   2 = mouse wheel scroll
+    ///   4 = keyboard key press
+    /// </summary>
+    public int MouseType;
+
+    /// <summary>
+    /// For type=1: Windows MouseButtons value (1=Left, 2=Right, 4=Middle).
+    /// For type=2: scroll delta (+1 = up, -1 = down).
+    /// For type=4: always 0.
+    /// </summary>
+    public int MouseButton;
+
+    /// <summary>For type=1: number of mouse buttons currently held. Otherwise 0.</summary>
+    public int MouseButtonCount;
+
+    /// <summary>Extra data (RESULT_ARRAY[5]). Currently always 0.</summary>
+    public long MouseExtra;
 }
 
 // ----------------------------------------------------------------

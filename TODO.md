@@ -86,7 +86,8 @@ d:\Github\gemuera\
 - [x] `ConsoleNode`: `PRINT_IMG` / 画像表示 (BBCode [img]タグ + 幅・高さ・揃え対応)
 - [x] `EmueraConsole`: LineCount / LastLineIsEmpty / IsTimeOut 追跡実装
 - [x] CBG (クライアント背景画像) 対応 (`TextureRect` + `CbgContainer`)
-- [ ] フォント設定 (Godot `FontFile` 読み込み / CJKフォント同梱)
+- [x] フォント設定 (Godot `SystemFont` によるCJKフォント適用 + `ApplyConfigFont()` をMainNodeから呼び出し)
+- [ ] フォントファイル同梱 (Godot `FontFile` 読み込み / CJKフォント同梱 — Android/Web向け)
 - [ ] 文字幅計算の実装 (`Font.get_string_size()`)
 
 ## フェーズ 3 — 入力処理の実装
@@ -96,7 +97,7 @@ d:\Github\gemuera\
 - [x] `ONEINPUT` — 1文字入力 (OneInput フラグ対応)
 - [x] タイムアウト付き入力 (`TINPUT`/`TINPUTS`) (Timelimit / IsTimeOut / IsTimeout)
 - [x] ボタン番号選択 (`INPUT` with button display) (OnMetaClicked)
-- [ ] マウス入力 (`MOUSE_*`) 対応
+- [x] マウス入力 (`MOUSE_*`/`INPUTMOUSEKEY`) 対応 (PrimitiveMouseKey — `_Input` ハンドラーでキャッチ、InputResult.MouseType/Button/X/Y/Count)
 - [ ] ファンクションキー・マクロ機能
 
 ## フェーズ 4 — ファイルI/O・セーブロード

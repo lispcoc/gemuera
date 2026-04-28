@@ -321,6 +321,19 @@ internal sealed class EmueraConsole
                 }
                 break;
 
+            case InputType.PrimitiveMouseKey:
+            {
+                // INPUTMOUSEKEY: store event data in RESULT_ARRAY[0..5].
+                // On timeout all values are 0 (no input).
+                vev.RESULT_ARRAY[0] = result.IsTimeout ? 0 : result.MouseType;
+                vev.RESULT_ARRAY[1] = result.IsTimeout ? 0 : result.MouseButton;
+                vev.RESULT_ARRAY[2] = result.IsTimeout ? 0 : result.MouseX;
+                vev.RESULT_ARRAY[3] = result.IsTimeout ? 0 : result.MouseY;
+                vev.RESULT_ARRAY[4] = result.IsTimeout ? 0 : result.MouseButtonCount;
+                vev.RESULT_ARRAY[5] = result.IsTimeout ? 0 : result.MouseExtra;
+                break;
+            }
+
             // Void: no variable to update
         }
     }

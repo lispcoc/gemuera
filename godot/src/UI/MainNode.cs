@@ -113,6 +113,9 @@ public partial class MainNode : Node
             MinorShift.Emuera.Runtime.Config.JSON.JSONConfig.Load();
             GemueraLogger.Log("Config loaded.");
 
+            // Apply font settings from config to the Godot UI (still on main thread here)
+            _console.ApplyConfigFont();
+
             // 3. Preload all ERB/CSV files into memory cache (mirrors EmueraConsole.StartConsole)
             GemueraLogger.Log("Preloading files...");
             MinorShift.Emuera.Runtime.Utils.Preload.Clear();
