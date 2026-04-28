@@ -1,0 +1,22 @@
+<Project Sdk="Godot.NET.Sdk/4.3.0">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>Gemuera</RootNamespace>
+    <AssemblyName>Gemuera</AssemblyName>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <!-- Shift-JIS support -->
+  <ItemGroup>
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+  </ItemGroup>
+
+  <!--
+    Core: ported from original/Emuera — pure C# interpreter engine.
+    Files under src/Core/ are adapted from MinorShift.Emuera
+    with Windows/GDI+/WinForms dependencies removed.
+  -->
+</Project>

@@ -1,0 +1,53 @@
+[gd_scene load_steps=3 format=3 uid="uid://console_scene"]
+
+[ext_resource type="Script" path="res://src/UI/ConsoleNode.cs" id="1_console"]
+
+[node name="Console" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_console")
+ScrollContainerPath = NodePath("VBox/Scroll")
+RichTextLabelPath = NodePath("VBox/Scroll/RichText")
+InputLinePath = NodePath("VBox/InputLine")
+StatusLabelPath = NodePath("VBox/StatusBar")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Scroll" type="ScrollContainer" parent="VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RichText" type="RichTextLabel" parent="VBox/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+bbcode_enabled = true
+scroll_active = true
+scroll_following = true
+autowrap_mode = 3
+custom_minimum_size = Vector2(0, 200)
+theme_override_font_sizes/normal_font_size = 18
+theme_override_colors/default_color = Color(0.753, 0.753, 0.753, 1)
+
+[node name="InputLine" type="LineEdit" parent="VBox"]
+layout_mode = 2
+placeholder_text = "入力してEnterキー / Type and press Enter"
+editable = false
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.753, 0.753, 0.753, 1)
+
+[node name="StatusBar" type="Label" parent="VBox"]
+layout_mode = 2
+text = "Gemuera"
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
