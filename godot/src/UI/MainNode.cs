@@ -39,6 +39,7 @@ public partial class MainNode : Node
     private MinorShift.Emuera.GameProc.Process _process;
     private bool _started = false;
     private string _exeDir = "";
+    private string _crashDir = "";
 
     // ----------------------------------------------------------------
     // Godot lifecycle
@@ -66,6 +67,8 @@ public partial class MainNode : Node
         // Log file goes into the game root so it is easy to find.
         string logPath = Path.Combine(resolvedRoot, "gemuera_runtime.log");
         GemueraLogger.Init(logPath);
+        _crashDir = Path.Combine(resolvedRoot, "crash");
+        Directory.CreateDirectory(_crashDir);
 
         // Hook unhandled C# exceptions (background threads)
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
@@ -73,7 +76,17 @@ public partial class MainNode : Node
             var ex = args.ExceptionObject as Exception;
             string msg = ex?.ToString() ?? args.ExceptionObject?.ToString() ?? "Unknown";
             GemueraLogger.LogError($"[UnhandledException] {msg}");
+            WriteCrashSnapshot("UnhandledException", msg);
             GD.PrintErr($"[Gemuera] UnhandledException: {msg}");
+        };
+
+        // Catch fire-and-forget task exceptions that would otherwise be silent.
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            string msg = args.Exception?.ToString() ?? "Unknown";
+            GemueraLogger.LogError($"[UnobservedTaskException] {msg}");
+            WriteCrashSnapshot("UnobservedTaskException", msg);
+            args.SetObserved();
         };
 
         GD.Print($"[Gemuera] ExeDir: {_exeDir}");
@@ -84,6 +97,31 @@ public partial class MainNode : Node
 
         // Boot the interpreter async so the UI remains responsive
         _ = StartInterpreterAsync(resolvedRoot);
+    }
+
+    private void WriteCrashSnapshot(string kind, string details)
+    {
+        try
+        {
+            string ts = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
+            string path = Path.Combine(_crashDir, $"crash_{ts}.log");
+            var lines = new[]
+            {
+                "=== Gemuera Crash Snapshot ===",
+                $"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}",
+                $"Kind: {kind}",
+                $"OS: {OS.GetName()}",
+                $"ExeDir: {_exeDir}",
+                "--- Details ---",
+                details ?? "(null)",
+                ""
+            };
+            File.WriteAllLines(path, lines, System.Text.Encoding.UTF8);
+        }
+        catch
+        {
+            // Never throw while handling a crash.
+        }
     }
 
     private async Task StartInterpreterAsync(string gameRoot)
