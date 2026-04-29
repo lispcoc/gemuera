@@ -1711,7 +1711,7 @@ public partial class ConsoleNode : Control, IGameConsole
         foreach (Match tagMatch in tagRegex.Matches(html))
         {
             if (tagMatch.Index > cursor)
-                sb.Append(EscapeBb(html[cursor..tagMatch.Index]));
+                sb.Append(EscapeBb(DecodeHtmlEntities(html[cursor..tagMatch.Index])));
 
             string tag = tagMatch.Value;
             string tagName = ExtractTagName(tag);
@@ -1761,6 +1761,17 @@ public partial class ConsoleNode : Control, IGameConsole
                     sb.Append(colorTag);
                 }
             }
+            else if (tagName.Equals("a", StringComparison.OrdinalIgnoreCase))
+            {
+                if (isClosing)
+                {
+                    sb.Append("[/url]");
+                }
+                else if (TryGetAnchorUrl(tag, out string href))
+                {
+                    sb.Append($"[url={UrlEncodeBb(href)}]");
+                }
+            }
             else if (tagName.Equals("p", StringComparison.OrdinalIgnoreCase)
                   || tagName.Equals("div", StringComparison.OrdinalIgnoreCase))
             {
@@ -1782,7 +1793,7 @@ public partial class ConsoleNode : Control, IGameConsole
         }
 
         if (cursor < html.Length)
-            sb.Append(EscapeBb(html[cursor..]));
+            sb.Append(EscapeBb(DecodeHtmlEntities(html[cursor..])));
 
         string converted = _stripHtmlTagRegex.Replace(sb.ToString(), string.Empty);
         return converted;
@@ -1906,6 +1917,69 @@ public partial class ConsoleNode : Control, IGameConsole
         }
 
         return false;
+    }
+
+    private static bool TryGetAnchorUrl(string fullTag, out string href)
+    {
+        href = string.Empty;
+        if (string.IsNullOrWhiteSpace(fullTag))
+            return false;
+
+        int start = fullTag.IndexOf(' ');
+        int end = fullTag.LastIndexOf('>');
+        if (start < 0 || end <= start)
+            return false;
+
+        var attrs = ParseAttributes(fullTag[start..end]);
+        if (!attrs.TryGetValue("href", out string rawHref) || string.IsNullOrWhiteSpace(rawHref))
+            return false;
+
+        href = DecodeHtmlEntities(rawHref).Trim();
+        if (href.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase))
+            return false;
+        return true;
+    }
+
+    private static string DecodeHtmlEntities(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return string.Empty;
+
+        return Regex.Replace(input, @"&(#x?[0-9A-Fa-f]+|[A-Za-z]+);", match =>
+        {
+            string token = match.Groups[1].Value;
+            switch (token.ToLowerInvariant())
+            {
+                case "amp": return "&";
+                case "lt": return "<";
+                case "gt": return ">";
+                case "quot": return "\"";
+                case "apos": return "'";
+                case "nbsp": return "\u00a0";
+            }
+
+            if (token.StartsWith("#x", StringComparison.OrdinalIgnoreCase))
+            {
+                if (int.TryParse(token[2..], System.Globalization.NumberStyles.HexNumber,
+                    System.Globalization.CultureInfo.InvariantCulture, out int codeHex)
+                    && codeHex >= 0 && codeHex <= 0x10FFFF)
+                {
+                    return char.ConvertFromUtf32(codeHex);
+                }
+                return match.Value;
+            }
+
+            if (token.StartsWith("#", StringComparison.Ordinal))
+            {
+                if (int.TryParse(token[1..], out int codeDec)
+                    && codeDec >= 0 && codeDec <= 0x10FFFF)
+                {
+                    return char.ConvertFromUtf32(codeDec);
+                }
+            }
+
+            return match.Value;
+        });
     }
 
     private static string GetAttrValue(Match attr)
