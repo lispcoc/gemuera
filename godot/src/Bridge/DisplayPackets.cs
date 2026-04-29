@@ -80,10 +80,14 @@ public sealed class InputResult
     /// </summary>
     public int MouseButton;
 
-    /// <summary>For type=1: number of mouse buttons currently held. Otherwise 0.</summary>
+    /// <summary>
+    /// INPUTMOUSEKEY RESULT:5 payload.
+    /// For button-map enabled CBG/HTML inputs this stores the 24-bit RGB map value,
+    /// or -1 when no mapped pixel is under the cursor.
+    /// </summary>
     public int MouseButtonCount;
 
-    /// <summary>Extra data (RESULT_ARRAY[5]). Currently always 0.</summary>
+    /// <summary>INPUTMOUSEKEY RESULT:6 payload (reserved, currently 0).</summary>
     public long MouseExtra;
 }
 

@@ -46,4 +46,8 @@ internal static class SoundManager
     {
         _console?.SetSeVolume(volume);
     }
+
+    public static bool IsBgmPlaying() => _console?.IsBgmPlaying() ?? false;
+
+    public static bool IsSePlaying() => _console?.IsSePlaying() ?? false;
 }

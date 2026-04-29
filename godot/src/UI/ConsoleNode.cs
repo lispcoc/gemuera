@@ -49,6 +49,9 @@ public partial class ConsoleNode : Control, IGameConsole
     private AudioStreamPlayer _sePlayer;
     private string _currentBgmPath = null;
     private Control _cbgContainer;
+    private Image _cbgButtonMapImage;
+    private volatile bool _bgmPlayingState;
+    private volatile bool _sePlayingState;
 
     // Colours (packed ARGB)
     private int _fgArgb = unchecked((int)0xFFC0C0C0); // default light gray
@@ -172,7 +175,20 @@ public partial class ConsoleNode : Control, IGameConsole
 
         _bgmPlayer = GetNode<AudioStreamPlayer>(BgmPlayerPath);
         _sePlayer  = GetNode<AudioStreamPlayer>(SePlayerPath);
-        _bgmPlayer.Finished += () => { /* loop BGM */ if (_bgmPlayer.Stream != null) _bgmPlayer.Play(); };
+        _bgmPlayer.Finished += () =>
+        {
+            /* loop BGM */
+            if (_bgmPlayer.Stream != null)
+            {
+                _bgmPlayer.Play();
+                _bgmPlayingState = true;
+            }
+            else
+            {
+                _bgmPlayingState = false;
+            }
+        };
+        _sePlayer.Finished += () => { _sePlayingState = false; };
         _cbgContainer = GetNode<Control>(CbgContainerPath);
 
         // Wire settings overlay
@@ -738,6 +754,52 @@ public partial class ConsoleNode : Control, IGameConsole
         });
     }
 
+    public void SetCbgButtonMap(string resourcePath, int width, int height)
+    {
+        Enqueue(() =>
+        {
+            _cbgButtonMapImage = null;
+            if (string.IsNullOrWhiteSpace(resourcePath))
+                return;
+
+            string resolved = ResolveImagePathForBbcode(resourcePath);
+            var image = new Image();
+            Error err = image.Load(resolved);
+            if (err != Error.Ok)
+            {
+                GD.PrintErr($"[CBG] Button map load failed: {resourcePath} ({err})");
+                return;
+            }
+
+            _cbgButtonMapImage = image;
+        });
+    }
+
+    public void ClearCbgButtonMap()
+    {
+        Enqueue(() => { _cbgButtonMapImage = null; });
+    }
+
+    private int SampleCbgButtonMapColor(Vector2 pos)
+    {
+        if (_cbgButtonMapImage == null)
+            return -1;
+
+        int x = (int)pos.X;
+        int y = (int)pos.Y;
+        if (x < 0 || y < 0 || x >= _cbgButtonMapImage.GetWidth() || y >= _cbgButtonMapImage.GetHeight())
+            return -1;
+
+        Color c = _cbgButtonMapImage.GetPixel(x, y);
+        if (c.A < 0.999f)
+            return -1;
+
+        int r = Mathf.Clamp((int)Mathf.Round(c.R * 255f), 0, 255);
+        int g = Mathf.Clamp((int)Mathf.Round(c.G * 255f), 0, 255);
+        int b = Mathf.Clamp((int)Mathf.Round(c.B * 255f), 0, 255);
+        return (r << 16) | (g << 8) | b;
+    }
+
     // ---- Sound ----
 
     public void PlayBgm(string resourcePath)
@@ -750,10 +812,12 @@ public partial class ConsoleNode : Control, IGameConsole
             if (stream == null)
             {
                 GD.PrintErr($"[Audio] BGM not found: {resourcePath}");
+                _bgmPlayingState = false;
                 return;
             }
             _bgmPlayer.Stream = stream;
             _bgmPlayer.Play();
+            _bgmPlayingState = true;
         });
     }
     public void StopBgm()
@@ -762,6 +826,7 @@ public partial class ConsoleNode : Control, IGameConsole
         {
             _bgmPlayer.Stop();
             _currentBgmPath = null;
+            _bgmPlayingState = false;
         });
     }
     public void FadeBgm(int durationMs)
@@ -778,6 +843,7 @@ public partial class ConsoleNode : Control, IGameConsole
                 _bgmPlayer.Stop();
                 _bgmPlayer.VolumeDb = startDb; // restore so next PLAYBGM is at normal volume
                 _currentBgmPath = null;
+                _bgmPlayingState = false;
             }));
         });
     }
@@ -789,10 +855,12 @@ public partial class ConsoleNode : Control, IGameConsole
             if (stream == null)
             {
                 GD.PrintErr($"[Audio] SE not found: {resourcePath}");
+                _sePlayingState = false;
                 return;
             }
             _sePlayer.Stream = stream;
             _sePlayer.Play();
+            _sePlayingState = true;
         });
     }
     public void SetBgmVolume(int volume)
@@ -803,6 +871,10 @@ public partial class ConsoleNode : Control, IGameConsole
     {
         Enqueue(() => _sePlayer.VolumeDb = Mathf.LinearToDb(Mathf.Clamp(volume / 100f, 0f, 1f)));
     }
+
+    public bool IsBgmPlaying() => _bgmPlayingState;
+
+    public bool IsSePlaying() => _sePlayingState;
 
     // ---- User-controlled volume (persisted via SettingsNode / gemuera_settings.cfg) ----
 
@@ -1246,6 +1318,7 @@ public partial class ConsoleNode : Control, IGameConsole
         {
             if (@event is InputEventMouseButton mb && mb.Pressed)
             {
+                _lastMousePos = mb.Position;
                 GetViewport().SetInputAsHandled();
                 _inputLine.Editable = false;
 
@@ -1272,13 +1345,16 @@ public partial class ConsoleNode : Control, IGameConsole
                     count = 1; // one button pressed
                 }
 
+                int cbgColor = SampleCbgButtonMapColor(mb.Position);
+
                 tcs.TrySetResult(new InputResult
                 {
                     MouseType        = type,
                     MouseButton      = button,
                     MouseX           = (int)mb.Position.X,
                     MouseY           = (int)mb.Position.Y,
-                    MouseButtonCount = count,
+                    MouseButtonCount = cbgColor,
+                    MouseExtra       = 0,
                 });
             }
         }

@@ -140,6 +140,7 @@ d:\Github\gemuera\
 - [x] フェード対応
 - [x] WMPLib・NAudio依存の完全除去 (`SoundManager` → `IGameConsole` 経由)
 - [x] BGM/SE ボリューム制御 (`SetBgmVolume`/`SetSeVolume` → `AudioStreamPlayer.VolumeDb`)
+- [x] `Sound.isPlaying()` の再生状態連携 (`SoundManager` → `IGameConsole.IsBgmPlaying/IsSePlaying`)
 - [x] フェード対応
 
 ## フェーズ 6 — 画像・WebP対応

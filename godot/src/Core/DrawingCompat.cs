@@ -143,15 +143,37 @@ namespace System.Drawing
 
     internal sealed class Bitmap : Image
     {
-        public int Width  { get; private set; }
-        public int Height { get; private set; }
-        public Bitmap(int w, int h) { Width = w; Height = h; }
-        public Bitmap(int w, int h, Imaging.PixelFormat pf) { Width = w; Height = h; }
-        public Bitmap(string filepath) { }
+        public string SourcePath { get; internal set; }
+
+        public Bitmap(int w, int h)
+        {
+            Width = w;
+            Height = h;
+        }
+
+        public Bitmap(int w, int h, Imaging.PixelFormat pf)
+        {
+            Width = w;
+            Height = h;
+        }
+
+        public Bitmap(string filepath)
+        {
+            SourcePath = filepath;
+            Width = 1;
+            Height = 1;
+        }
+
         public nint GetHicon() => nint.Zero;
         public void Save(string path) { }
         public void Save(System.IO.Stream s, Imaging.ImageFormat fmt) { }
-        public override void Dispose() { Width = 0; Height = 0; }
+
+        public override void Dispose()
+        {
+            Width = 0;
+            Height = 0;
+            SourcePath = null;
+        }
     }
 
     internal sealed class Font : IDisposable

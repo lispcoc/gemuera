@@ -10,18 +10,13 @@ File: `godot/src/Core/GameView/EmueraConsole.cs`
 
 - `ConsoleWindow` / `HotkeyStateStub` / `ConsolePictureBox` are compatibility placeholders.
 - `PrintHTMLIsland()` / `ClearHTMLIsland()` are empty.
-- Background APIs are currently no-op or fixed-false:
-  - `AddBackgroundImage()`
-  - `RemoveBackground()`
-  - `ClearBackgroundImage()`
-  - `CBG_Clear()`
-  - `CBG_ClearRange()`
-  - `CBG_ClearButton()`
-  - `CBG_ClearBMap()`
-  - `CBG_SetGraphics()`
-  - `CBG_SetButtonMap()`
-  - `CBG_SetImage()` returns `false`
-  - `CBG_SetButtonImage()` returns `false`
+- Background APIs are partially bridged:
+  - `AddBackgroundImage()` / `RemoveBackground()` / `ClearBackgroundImage()` now rebuild via `IGameConsole.CbgSet/CbgClear`
+  - `CBG_Clear()` / `CBG_ClearRange()` / `CBG_ClearButton()` now track layer metadata (depth/button) and clear selectively
+  - `CBG_ClearBMap()` now resets button-map state
+  - `CBG_SetButtonMap()` now forwards a file-backed map to UI and `INPUTMOUSEKEY` can sample map RGB into `RESULT:5`
+  - `CBG_SetGraphics()` now works when the source `GraphicsImage` carries a file-backed bitmap path
+  - `CBG_SetImage()` / `CBG_SetButtonImage()` now succeed for resource-backed sprites (`AppContents.GetSprite`経由)
 - Tooltip APIs are all no-op:
   - `SetToolTipColor()`
   - `SetToolTipDelay()`
@@ -31,23 +26,23 @@ File: `godot/src/Core/GameView/EmueraConsole.cs`
   - `SetToolTipFormat()`
   - `SetToolTipImg()`
   - `CustomToolTip()`
-- `PrintStringBuffer` remains a minimal stub: `IsEmpty => true`.
+- `PrintStringBuffer` now mirrors line-emptiness (`IsEmpty` reflects current line state) but full original buffer semantics are still未移植.
 
 Impact:
 - Script/UI compatibility is preserved at compile/runtime level.
-- Features depending on island HTML buffering, advanced CBG composition, tooltip behavior, or print-buffer semantics are incomplete.
+- Features depending on island HTML buffering, CBG button-map hover/tooltip parity, tooltip behavior, or print-buffer semantics are incomplete.
 
 ## 2) Image pipeline stubs
 
 File: `godot/src/Core/GameView/ImageStubs.cs`
 
-- `GraphicsImage` draw operations are no-op (`GDrawString`, `GDrawLine`, `GFillRectangle`, `GDrawG*`, etc.).
-- `CroppedImage` and `SpriteAnime` are placeholders (`IsCreated => false`, no frame logic).
-- `AppContents` is mostly stub:
-  - `LoadContents()` returns `null`.
-  - `GetSprite()` returns `null`.
-  - sprite create/dispose APIs are no-op.
-  - `SpriteDisposeAll()` returns `0`.
+- `GraphicsImage` draw operations are still no-op (`GDrawString`, `GDrawLine`, `GFillRectangle`, `GDrawG*`, etc.).
+- `GraphicsImage.GCreateFromF()` now clones minimal bitmap metadata instead of holding caller-owned bitmap instances.
+- `CroppedImage` / `SpriteAnime` now keep minimal created/size state, but frame rendering logic is未実装.
+- `AppContents` now has a minimal registry:
+  - `GetSprite()` resolves files under `Program.ContentDir` and returns resource-backed sprites.
+  - `CreateSpriteG()` / `CreateSpriteAnime()` / `SpriteDispose()` / `SpriteDisposeAll()` are functional at registry level.
+  - Full image decode/caching parity with Emuera is still未実装.
 
 Impact:
 - Basic compile compatibility exists, but full sprite/image-cache behavior from Emuera is not yet ported.
@@ -93,17 +88,7 @@ File: `godot/src/Core/Runtime/Utils/WebPWrapper.cs`
 Impact:
 - Any code path expecting direct `WebPWrapper.Decode()` support remains unsupported.
 
-## 7) Sound state stub
-
-File: `godot/src/Core/Runtime/Utils/Sound.cs`
-
-- Playback delegation exists (`SoundManager` -> `IGameConsole`).
-- `isPlaying()` is still fixed `false`.
-
-Impact:
-- Scripts relying on playback-state polling may behave differently.
-
-## 8) Plugin manager partial placeholders
+## 7) Plugin manager partial placeholders
 
 File: `godot/src/Core/Runtime/Utils/PluginSystem/PluginManager.cs`
 
@@ -121,7 +106,6 @@ Impact:
 ## Suggested next implementation order
 
 1. `ImageStubs.cs` / `AppContents` parity (cache + sprite behavior)
-2. `EmueraConsole` CBG/image/button-map behavior
-3. `PrintStringBuffer` semantics parity
-4. `Sound.isPlaying()` real state integration
-5. Optional: plugin placeholder methods
+2. `PrintStringBuffer` full semantics parity
+3. `EmueraConsole` CBG hover/tooltip parity
+4. Optional: plugin placeholder methods

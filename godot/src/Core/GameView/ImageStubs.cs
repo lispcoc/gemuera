@@ -1,10 +1,19 @@
 // Stub types for MinorShift.Emuera.UI.Game.Image namespace.
-// Full image rendering is deferred to Phase 3.
+// Full image rendering is deferred, but basic sprite registry behavior is implemented
+// so SPRITE*/CBG* script paths can progress without always failing.
+using MinorShift.Emuera;
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.IO;
 
 namespace MinorShift.Emuera.UI.Game.Image;
+
+internal interface IResourceBackedSprite
+{
+    string ResourcePath { get; }
+}
 
 // ---------------------------------------------------------------------------
 // AbstractImage  (base for GraphicsImage / ConstImage)
@@ -44,8 +53,29 @@ internal sealed class GraphicsImage : AbstractImage
     public FontStyle Fontstyle => Fnt?.Style ?? FontStyle.Regular;
 
     // Graphics operations — all no-ops in stub phase
-    public void GCreate(int w, int h, bool useGDI)            { _bitmap = new Bitmap(w, h); _created = true; }
-    public void GCreateFromF(Bitmap bmp, bool useGDI)         { _bitmap = bmp; _created = bmp != null; }
+    public void GCreate(int w, int h, bool useGDI)
+    {
+        _bitmap = new Bitmap(w, h);
+        _created = true;
+    }
+
+    public void GCreateFromF(Bitmap bmp, bool useGDI)
+    {
+        if (bmp == null)
+        {
+            _bitmap = null;
+            _created = false;
+            return;
+        }
+
+        // Keep an independent instance because callers may dispose the source bitmap immediately.
+        _bitmap = new Bitmap(Math.Max(1, bmp.Width), Math.Max(1, bmp.Height))
+        {
+            SourcePath = bmp.SourcePath
+        };
+        _created = true;
+    }
+
     public void GDispose()                                     { _bitmap?.Dispose(); _bitmap = null; _created = false; }
     public void GClear(Color c)                                { }
     public void GClear(Color c, int x, int y, int w, int h)   { }
@@ -87,12 +117,26 @@ internal abstract class ASprite : IDisposable
 // CroppedImage / SpriteAnime (concrete ASprite stubs)
 // ---------------------------------------------------------------------------
 
-internal sealed class CroppedImage : ASprite
+internal sealed class CroppedImage : ASprite, IResourceBackedSprite
 {
     private Point _pos;
-    public CroppedImage(GraphicsImage src, Rectangle rect) { }
-    public override bool IsCreated => false;
-    public override Size DestBaseSize => Size.Empty;
+    private readonly Size _size;
+    public string ResourcePath { get; }
+
+    public CroppedImage(GraphicsImage src, Rectangle rect)
+    {
+        _size = new Size(Math.Max(0, rect.Width), Math.Max(0, rect.Height));
+        ResourcePath = string.Empty;
+    }
+
+    public CroppedImage(string resourcePath, int width, int height)
+    {
+        ResourcePath = resourcePath ?? string.Empty;
+        _size = new Size(Math.Max(1, width), Math.Max(1, height));
+    }
+
+    public override bool IsCreated => _size.Width > 0 && _size.Height > 0;
+    public override Size DestBaseSize => _size;
     public override Point DestBasePosition { get => _pos; set => _pos = value; }
     public override EraColor SpriteGetColor(int x, int y) => EraColor.Empty;
     public override void AddFrame(GraphicsImage g, Rectangle rect, Point offset, int delay) { }
@@ -102,9 +146,10 @@ internal sealed class CroppedImage : ASprite
 internal sealed class SpriteAnime : ASprite
 {
     private Point _pos;
-    public SpriteAnime(int w, int h) { }
-    public override bool IsCreated => false;
-    public override Size DestBaseSize => Size.Empty;
+    private readonly Size _size;
+    public SpriteAnime(int w, int h) { _size = new Size(Math.Max(1, w), Math.Max(1, h)); }
+    public override bool IsCreated => _size.Width > 0 && _size.Height > 0;
+    public override Size DestBaseSize => _size;
     public override Point DestBasePosition { get => _pos; set => _pos = value; }
     public override EraColor SpriteGetColor(int x, int y) => EraColor.Empty;
     public override void AddFrame(GraphicsImage g, Rectangle rect, Point offset, int delay) { }
@@ -120,21 +165,30 @@ internal sealed class ConstImage : AbstractImage
     public readonly string Name;
     public ConstImage(string name) { Name = name; }
     public override Bitmap Bitmap { get; set; }
-    public override bool IsCreated => false;
+    public override bool IsCreated => Bitmap != null;
     public override void Dispose() { Bitmap?.Dispose(); Bitmap = null; }
 }
 
 // ---------------------------------------------------------------------------
-// AppContents  (static image registry — stubs return null / no-op)
+// AppContents  (static image registry)
 // ---------------------------------------------------------------------------
 
 internal static class AppContents
 {
-    private static readonly System.Collections.Generic.Dictionary<int, GraphicsImage> _graphics = [];
-    public static System.Collections.Generic.HashSet<ConstImage> tempLoadedConstImages = [];
-    public static System.Collections.Generic.HashSet<GraphicsImage> tempLoadedGraphicsImages = [];
+    private static readonly Dictionary<int, GraphicsImage> _graphics = [];
+    private static readonly Dictionary<string, ASprite> _sprites =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly string[] _spriteExts = [".png", ".jpg", ".jpeg", ".webp", ".bmp"];
 
-    public static Exception LoadContents(bool reload) => null;
+    public static HashSet<ConstImage> tempLoadedConstImages = [];
+    public static HashSet<GraphicsImage> tempLoadedGraphicsImages = [];
+
+    public static Exception LoadContents(bool reload)
+    {
+        if (reload)
+            _sprites.Clear();
+        return null;
+    }
 
     public static GraphicsImage GetGraphics(int id)
     {
@@ -146,18 +200,94 @@ internal static class AppContents
         return g;
     }
 
-    public static ASprite GetSprite(string name) => null;
+    private static string ResolveSpritePath(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return null;
 
-    public static void CreateSpriteG(string imgName, GraphicsImage parent, System.Drawing.Rectangle rect) { }
+        string normalized = name.Replace('/', Path.DirectorySeparatorChar)
+            .Replace('\\', Path.DirectorySeparatorChar);
 
-    public static void CreateSpriteAnime(string imgName, int w, int h) { }
+        if (Path.IsPathRooted(normalized) && File.Exists(normalized))
+            return normalized;
 
-    public static void SpriteDispose(string name) { }
+        if (Path.HasExtension(normalized))
+        {
+            string candidate = Path.Combine(Program.ContentDir, normalized);
+            if (File.Exists(candidate))
+                return candidate;
+        }
+        else
+        {
+            string basePath = Path.Combine(Program.ContentDir, normalized);
+            foreach (string ext in _spriteExts)
+            {
+                string candidate = basePath + ext;
+                if (File.Exists(candidate))
+                    return candidate;
+            }
+        }
 
-    public static long SpriteDisposeAll(bool delCsvImage) => 0L;
+        return null;
+    }
 
-    public static void UnloadContents() { _graphics.Clear(); }
+    public static ASprite GetSprite(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return null;
 
-    public static void UnloadTempLoadedConstImageNames()  { tempLoadedConstImages.Clear(); }
+        if (_sprites.TryGetValue(name, out var existing) && existing != null && existing.IsCreated)
+            return existing;
+
+        string path = ResolveSpritePath(name);
+        if (path == null)
+            return null;
+
+        var sprite = new CroppedImage(path, 1, 1);
+        _sprites[name] = sprite;
+        return sprite;
+    }
+
+    public static void CreateSpriteG(string imgName, GraphicsImage parent, Rectangle rect)
+    {
+        if (string.IsNullOrWhiteSpace(imgName) || parent == null || !parent.IsCreated)
+            return;
+
+        _sprites[imgName] = new CroppedImage(parent, rect);
+    }
+
+    public static void CreateSpriteAnime(string imgName, int w, int h)
+    {
+        if (string.IsNullOrWhiteSpace(imgName))
+            return;
+        _sprites[imgName] = new SpriteAnime(w, h);
+    }
+
+    public static void SpriteDispose(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return;
+
+        if (_sprites.TryGetValue(name, out var sprite))
+            sprite?.Dispose();
+        _sprites.Remove(name);
+    }
+
+    public static long SpriteDisposeAll(bool delCsvImage)
+    {
+        long count = _sprites.Count;
+        foreach (var sprite in _sprites.Values)
+            sprite?.Dispose();
+        _sprites.Clear();
+        return count;
+    }
+
+    public static void UnloadContents()
+    {
+        _graphics.Clear();
+        SpriteDisposeAll(true);
+    }
+
+    public static void UnloadTempLoadedConstImageNames() { tempLoadedConstImages.Clear(); }
     public static void UnloadTempLoadedGraphicsImageNames() { tempLoadedGraphicsImages.Clear(); }
 }

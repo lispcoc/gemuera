@@ -27,7 +27,12 @@ internal class Sound
         SoundManager.StopBgm();
     }
 
-    public bool isPlaying() => false; // stub
+    public bool isPlaying()
+    {
+        return _repeat == -1
+            ? SoundManager.IsBgmPlaying()
+            : SoundManager.IsSePlaying();
+    }
 
     public void setVolume(int vol)
     {

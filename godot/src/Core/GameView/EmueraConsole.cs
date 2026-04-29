@@ -11,6 +11,8 @@ using MinorShift.Emuera.UI.Game.Image;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using MinorShift.Emuera.Runtime.Utils.EvilMask;
 using MixedNum = MinorShift.Emuera.Runtime.Utils.EvilMask.Utils.MixedNum;
@@ -71,6 +73,8 @@ internal sealed class EmueraConsole
     private ConsoleRedraw _redraw = ConsoleRedraw.Normal;
     private readonly List<ConsoleDisplayLine> _displayLineList = [];
     private readonly ConsoleWindow _window = new();
+    private readonly List<BackgroundLayer> _backgroundLayers = [];
+    private GraphicsImage _cbgButtonMap;
 
     // Line state tracking for EmptyLine / LastLineIsEmpty / LineCount
     private long _lineCount = 0;
@@ -78,11 +82,23 @@ internal sealed class EmueraConsole
     private bool _lastLineIsEmpty = true;
     private bool _lastInputWasTimeout = false;
 
+    private sealed class BackgroundLayer
+    {
+        public string Name { get; init; } = string.Empty;
+        public int Depth { get; init; }
+        public int X { get; init; }
+        public int Y { get; init; }
+        public int Width { get; init; }
+        public int Height { get; init; }
+        public bool IsButton { get; init; }
+    }
+
     public EmueraConsole(IGameConsole inner)
     {
         _inner = inner;
         _stringStyle = new StringStyle(Config.ForeColor, FontStyle.Regular, Config.FontName);
         _bgColor = Config.BackColor;
+        PrintBuffer = new PrintStringBuffer(() => _currentLineIsEmpty);
     }
 
     // ---- Core properties ----
@@ -143,7 +159,7 @@ internal sealed class EmueraConsole
     // Calling NewLine() here caused every PRINT to add a spurious newline, breaking multi-column output (e.g. roguelike ASCII art maps).
     public void Print(string str, bool lineEnd) { Print(str); }
 
-    public PrintStringBuffer PrintBuffer { get; } = new PrintStringBuffer();
+    public PrintStringBuffer PrintBuffer { get; }
 
     public Dictionary<long, List<AConsoleDisplayNode>> EscapedParts { get; } = new Dictionary<long, List<AConsoleDisplayNode>>();
     public void Await(int ms) => System.Threading.Thread.Sleep(ms);
@@ -415,7 +431,8 @@ internal sealed class EmueraConsole
             case InputType.PrimitiveMouseKey:
             {
                 // INPUTMOUSEKEY: store event data in RESULT_ARRAY[0..5].
-                // On timeout all values are 0 (no input).
+                // RESULT:5 carries the sampled CBG button-map RGB value (-1 when none).
+                // RESULT:6 is reserved for future extension (currently 0).
                 vev.RESULT_ARRAY[0] = result.IsTimeout ? 0 : result.MouseType;
                 vev.RESULT_ARRAY[1] = result.IsTimeout ? 0 : result.MouseButton;
                 vev.RESULT_ARRAY[2] = result.IsTimeout ? 0 : result.MouseX;
@@ -497,27 +514,140 @@ internal sealed class EmueraConsole
 
     // ---- CBG (client background graphics) ----
 
-    public void AddBackgroundImage(string name, int depth, int opacity) { }
+    private void RebuildBackgroundLayers()
+    {
+        _inner.CbgClear();
+        foreach (var layer in _backgroundLayers.OrderBy(v => v.Depth))
+            _inner.CbgSet(layer.Name, layer.X, layer.Y, layer.Width, layer.Height);
+    }
 
-    public void RemoveBackground(string name) { }
+    private void AddCbgLayer(string path, int x, int y, int width, int height, int depth, bool isButton)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return;
 
-    public void ClearBackgroundImage() { }
+        _backgroundLayers.Add(new BackgroundLayer
+        {
+            Name = path,
+            X = x,
+            Y = y,
+            Width = width,
+            Height = height,
+            Depth = depth,
+            IsButton = isButton,
+        });
+        RebuildBackgroundLayers();
+    }
 
-    public void CBG_Clear() { }
+    public void AddBackgroundImage(string name, int depth, int opacity)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return;
 
-    public void CBG_ClearRange(int x, int y) { }
+        _backgroundLayers.RemoveAll(v => string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase));
+        AddCbgLayer(name, 0, 0, 0, 0, depth, false);
+    }
 
-    public void CBG_ClearButton() { }
+    public void RemoveBackground(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return;
 
-    public void CBG_ClearBMap() { }
+        if (_backgroundLayers.RemoveAll(v => string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase)) > 0)
+            RebuildBackgroundLayers();
+    }
 
-    public void CBG_SetGraphics(GraphicsImage g, int x, int y, int z) { }
+    public void ClearBackgroundImage()
+    {
+        _backgroundLayers.RemoveAll(v => !v.IsButton);
+        RebuildBackgroundLayers();
+    }
 
-    public void CBG_SetButtonMap(GraphicsImage g) { }
+    public void CBG_Clear()
+    {
+        _backgroundLayers.Clear();
+        CBG_ClearBMap();
+        _inner.CbgClear();
+    }
 
-    public bool CBG_SetImage(object img, int x, int y, int z) => false;
+    public void CBG_ClearRange(int zmin, int zmax)
+    {
+        if (zmin > zmax)
+            return;
 
-    public bool CBG_SetButtonImage(int b, ASprite imgN, ASprite imgB, int x, int y, int z, string tooltip) => false;
+        _backgroundLayers.RemoveAll(v => v.Depth != 0 && v.Depth >= zmin && v.Depth <= zmax);
+        RebuildBackgroundLayers();
+    }
+
+    public void CBG_ClearButton()
+    {
+        _backgroundLayers.RemoveAll(v => v.IsButton);
+        CBG_ClearBMap();
+        RebuildBackgroundLayers();
+    }
+
+    public void CBG_ClearBMap()
+    {
+        _cbgButtonMap = null;
+        _inner.ClearCbgButtonMap();
+    }
+
+    public void CBG_SetGraphics(GraphicsImage g, int x, int y, int z)
+    {
+        if (g == null || !g.IsCreated || g.Bitmap == null)
+            return;
+
+        string path = g.Bitmap.SourcePath;
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            return;
+
+        AddCbgLayer(path, x, y, g.Width, g.Height, z, false);
+    }
+
+    public void CBG_SetButtonMap(GraphicsImage g)
+    {
+        if (g == null || !g.IsCreated || g.Bitmap == null)
+            return;
+
+        _cbgButtonMap = g;
+
+        string path = g.Bitmap.SourcePath;
+        if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+            _inner.SetCbgButtonMap(path, g.Width, g.Height);
+    }
+
+    private static bool TryGetSpriteResource(ASprite sprite, out string resourcePath)
+    {
+        resourcePath = string.Empty;
+        if (sprite is IResourceBackedSprite rs && !string.IsNullOrWhiteSpace(rs.ResourcePath))
+        {
+            resourcePath = rs.ResourcePath;
+            return true;
+        }
+        return false;
+    }
+
+    public bool CBG_SetImage(object img, int x, int y, int z)
+    {
+        if (img is not ASprite sprite || !sprite.IsCreated)
+            return false;
+        if (!TryGetSpriteResource(sprite, out string path))
+            return false;
+
+        AddCbgLayer(path, x, y, sprite.DestBaseSize.Width, sprite.DestBaseSize.Height, z, false);
+        return true;
+    }
+
+    public bool CBG_SetButtonImage(int b, ASprite imgN, ASprite imgB, int x, int y, int z, string tooltip)
+    {
+        if (imgN == null || !imgN.IsCreated)
+            return false;
+        if (!TryGetSpriteResource(imgN, out string path))
+            return false;
+
+        AddCbgLayer(path, x, y, imgN.DestBaseSize.Width, imgN.DestBaseSize.Height, z, true);
+        return true;
+    }
 
     // ---- Tooltip (all no-ops on non-Windows) ----
 
@@ -541,5 +671,12 @@ internal sealed class EmueraConsole
 /// <summary>Stub for the original PrintStringBuffer.</summary>
 internal sealed class PrintStringBuffer
 {
-    public bool IsEmpty => true;
+    private readonly Func<bool> _isLineEmpty;
+
+    public PrintStringBuffer(Func<bool> isLineEmpty)
+    {
+        _isLineEmpty = isLineEmpty;
+    }
+
+    public bool IsEmpty => _isLineEmpty();
 }

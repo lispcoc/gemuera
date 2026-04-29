@@ -64,6 +64,12 @@ public interface IGameConsole
     /// <summary>CBGCLEAR — remove all client background images.</summary>
     void CbgClear();
 
+    /// <summary>CBGSETBMAPG — set the CBG button-map image used by INPUTMOUSEKEY hit testing.</summary>
+    void SetCbgButtonMap(string resourcePath, int width, int height);
+
+    /// <summary>CBGREMOVEBMAP — clear the active CBG button-map image.</summary>
+    void ClearCbgButtonMap();
+
     // ----------------------------------------------------------------
     // Sound
     // ----------------------------------------------------------------
@@ -85,6 +91,12 @@ public interface IGameConsole
 
     /// <summary>Set SE volume (0–100).</summary>
     void SetSeVolume(int volume);
+
+    /// <summary>Whether looping BGM is currently playing.</summary>
+    bool IsBgmPlaying();
+
+    /// <summary>Whether a sound effect is currently playing.</summary>
+    bool IsSePlaying();
 
     // ----------------------------------------------------------------
     // Mouse
