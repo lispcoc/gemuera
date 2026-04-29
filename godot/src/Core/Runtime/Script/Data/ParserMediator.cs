@@ -2,6 +2,7 @@
 using MinorShift.Emuera.Runtime.Config;
 using MinorShift.Emuera.Runtime.Script.Statements;
 using MinorShift.Emuera.Runtime.Utils;
+using Gemuera;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -28,6 +29,7 @@ internal partial class ParserMediator
 		if (level <Config.DisplayWarningLevel && !Program.AnalysisMode)
 			return;
 		warningList.Add(new ParserWarning(str, pos, level, stack));
+		LogParserWarning(str, pos, level, "ConfigWarn");
 	}
 
 	static EmueraConsole console;
@@ -103,6 +105,7 @@ internal partial class ParserMediator
 				warningList.Add(new ParserWarning(str, pos, level, stack));
 			}
 		}
+		LogParserWarning(str, pos, level, "Warn");
 	}
 
 	/// <summary>
@@ -129,6 +132,7 @@ internal partial class ParserMediator
 			return;
 		if (console != null && !console.RunERBFromMemory)
 			warningList.Add(new ParserWarning(str, line.Position, level, stack));
+		LogParserWarning(str, line.Position, level, isError ? "Error" : "Warn");
 		//				console.PrintWarning(str, line.Position, level);
 	}
 
@@ -171,6 +175,17 @@ internal partial class ParserMediator
 		public ScriptPosition? WarningPos;
 		public int WarningLevel;
 		public string StackTrace;
+	}
+
+	private static void LogParserWarning(string message, ScriptPosition? pos, int level, string kind)
+	{
+		string location = "(position:unknown)";
+		if (pos.HasValue)
+		{
+			ScriptPosition p = pos.Value;
+			location = $"{p.Filename}:{p.LineNo}";
+		}
+		GemueraLogger.LogWarn($"[Parser:{kind}:L{level}] {location} {message}");
 	}
 
 	[GeneratedRegex(@"(?<!\\),")]

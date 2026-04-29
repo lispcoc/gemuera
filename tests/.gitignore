@@ -1,0 +1,18 @@
+# Runtime logs
+*.log
+gemuera_runtime.log
+gemuera_init.log
+
+# Crash artifacts
+crash/*.log
+crash/*.txt
+crash/*.dmp
+
+# Save data generated during test runs
+sav/*.sav
+
+# Runtime variable data generated during test runs
+dat/*.dat
+
+# Local desktop plugins for test runs
+Plugins/*.dll

@@ -7,6 +7,7 @@ using MinorShift.Emuera.GameView;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using GodotFileAccess = Godot.FileAccess;
 
@@ -294,7 +295,8 @@ public partial class MainNode : Node
             {
                 using var fa = GodotFileAccess.Open(filePath, GodotFileAccess.ModeFlags.Read);
                 if (fa == null) continue;
-                string text = fa.GetAsText();
+                byte[] bytes = fa.GetBuffer((long)fa.GetLength());
+                string text = DecodeEraText(bytes);
                 string[] lines = text.Split('\n');
                 // Strip trailing \r from each line (Windows line endings)
                 for (int i = 0; i < lines.Length; i++)
@@ -302,6 +304,44 @@ public partial class MainNode : Node
                 MinorShift.Emuera.Runtime.Utils.Preload.AddToCache(filePath, lines);
             }
         });
+    }
+
+    /// <summary>
+    /// Decode ERA script bytes with BOM-aware handling.
+    /// Priority: UTF BOM -> strict UTF-8 -> Shift-JIS fallback.
+    /// </summary>
+    private static string DecodeEraText(byte[] bytes)
+    {
+        if (bytes == null || bytes.Length == 0)
+            return string.Empty;
+
+        if (HasPrefix(bytes, 0xEF, 0xBB, 0xBF))
+            return Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3);
+        if (HasPrefix(bytes, 0xFF, 0xFE))
+            return Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2);
+        if (HasPrefix(bytes, 0xFE, 0xFF))
+            return Encoding.BigEndianUnicode.GetString(bytes, 2, bytes.Length - 2);
+
+        try
+        {
+            return new UTF8Encoding(false, true).GetString(bytes);
+        }
+        catch (DecoderFallbackException)
+        {
+            // Legacy ERA content is often Shift-JIS encoded.
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            return Encoding.GetEncoding(932).GetString(bytes);
+        }
+    }
+
+    private static bool HasPrefix(byte[] bytes, params byte[] prefix)
+    {
+        if (bytes.Length < prefix.Length) return false;
+        for (int i = 0; i < prefix.Length; i++)
+        {
+            if (bytes[i] != prefix[i]) return false;
+        }
+        return true;
     }
 
     /// <summary>
