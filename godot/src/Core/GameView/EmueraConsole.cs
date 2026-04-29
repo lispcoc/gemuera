@@ -169,6 +169,7 @@ internal sealed class EmueraConsole
     {
         var style = ToBridgeStyle();
         _inner.PrintButton(display, input.ToString(), style);
+        AddButtonToDisplayHistory(display, input);
         _currentLineIsEmpty = false;
     }
 
@@ -176,6 +177,7 @@ internal sealed class EmueraConsole
     {
         var style = ToBridgeStyle();
         _inner.PrintButton(display, input, style);
+        AddButtonToDisplayHistory(display, input);
         _currentLineIsEmpty = false;
     }
 
@@ -184,6 +186,7 @@ internal sealed class EmueraConsole
         var style = ToBridgeStyle();
         style.Align = isRight ? 2 : 1;
         _inner.PrintButton(display, input.ToString(), style);
+        AddButtonToDisplayHistory(display, input);
         _currentLineIsEmpty = false;
     }
 
@@ -192,7 +195,30 @@ internal sealed class EmueraConsole
         var style = ToBridgeStyle();
         style.Align = isRight ? 2 : 1;
         _inner.PrintButton(display, input, style);
+        AddButtonToDisplayHistory(display, input);
         _currentLineIsEmpty = false;
+    }
+
+    // BINPUT/BINPUTS in the core checks DisplayLineList for at least one button.
+    // Keep a lightweight in-memory history entry so those checks behave on the Godot adapter.
+    private void AddButtonToDisplayHistory(string display, long input)
+    {
+        var button = new ConsoleButtonString([], input);
+        var line = new ConsoleDisplayLine([button], true, false)
+        {
+            LineNo = (int)_lineCount
+        };
+        _displayLineList.Add(line);
+    }
+
+    private void AddButtonToDisplayHistory(string display, string input)
+    {
+        var button = new ConsoleButtonString([], input ?? string.Empty);
+        var line = new ConsoleDisplayLine([button], true, false)
+        {
+            LineNo = (int)_lineCount
+        };
+        _displayLineList.Add(line);
     }
 
     public void PrintTemporaryLine(string str) { Print(str); NewLine(); }
@@ -233,7 +259,25 @@ internal sealed class EmueraConsole
 
     public void ClearHTMLIsland() { }
 
-    public void PrintImg(string name, string nameb, string namem, object w, object h, object depth) { }
+    public void PrintImg(string name, string nameb, string namem, MixedNum height, MixedNum width, MixedNum depth)
+    {
+        // Phase 2 bridge: map PRINT_IMG to the Godot inline image API.
+        // nameb/namem/depth are for extended image modes and are currently ignored.
+        if (string.IsNullOrWhiteSpace(name))
+            return;
+
+        int imgWidth = (width?.num ?? 0);
+        int imgHeight = (height?.num ?? 0);
+        int align = _alignment switch
+        {
+            DisplayLineAlignment.CENTER => 1,
+            DisplayLineAlignment.RIGHT => 2,
+            _ => 0,
+        };
+
+        _inner.PrintImage(name, imgWidth, imgHeight, align);
+        _currentLineIsEmpty = false;
+    }
 
     public void PrintShape(string shape, MixedNum[] param) { }
 
@@ -262,6 +306,10 @@ internal sealed class EmueraConsole
     {
         _inner.ClearLine(count);
         _lineCount = System.Math.Max(0, _lineCount - count);
+        if (count <= 0) return;
+        int remove = System.Math.Min(count, _displayLineList.Count);
+        if (remove > 0)
+            _displayLineList.RemoveRange(_displayLineList.Count - remove, remove);
     }
 
     public void RefreshStrings(bool force) { }
@@ -398,6 +446,7 @@ internal sealed class EmueraConsole
         _lineCount = 0;
         _currentLineIsEmpty = true;
         _lastLineIsEmpty = true;
+        _displayLineList.Clear();
     }
 
     public void Quit() => _inner.Quit();

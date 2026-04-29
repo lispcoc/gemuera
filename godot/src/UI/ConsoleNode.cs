@@ -101,8 +101,11 @@ public partial class ConsoleNode : Control, IGameConsole
         new(@"<div\b([^>]*)>(.*?)</div>",
             RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
     private static readonly Regex _attrRegex =
-        new("([a-zA-Z][a-zA-Z0-9_-]*)\\s*=\\s*(['\"])(.*?)\\2",
+        new("([a-zA-Z][a-zA-Z0-9_-]*)\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s>]+))",
             RegexOptions.Singleline | RegexOptions.Compiled);
+    private static readonly Regex _stripHtmlTagRegex =
+        new(@"</?(?:div|font|button|nonbutton|p|span|nobr)\\b[^>]*>",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly string[] _imageExtCandidates =
         { ".png", ".jpg", ".jpeg", ".webp", ".bmp" };
@@ -658,11 +661,12 @@ public partial class ConsoleNode : Control, IGameConsole
     public void PrintImage(string resourcePath, int width, int height, int align)
     {
         // Phase 2: inline image via BBCode [img] tag with optional size.
-        // resourcePath should be a Godot res:// or user:// path.
+        // Accept relative game paths too and resolve them to an existing file path.
         // Alignment: 0=left, 1=center, 2=right
+        string resolvedPath = ResolveImagePathForBbcode(resourcePath);
         string alignTag = align switch { 1 => "center", 2 => "right", _ => "left" };
         string sizeAttr = (width > 0 && height > 0) ? $" width={width} height={height}" : "";
-        string bb = $"[{alignTag}][img{sizeAttr}]{resourcePath}[/img][/{alignTag}]\n";
+        string bb = $"[{alignTag}][img{sizeAttr}]{resolvedPath}[/img][/{alignTag}]\n";
         Enqueue(() =>
         {
             _richText.AppendText(bb);
@@ -1567,7 +1571,7 @@ public partial class ConsoleNode : Control, IGameConsole
             foreach (Match attr in _attrRegex.Matches(attrText))
             {
                 string key = attr.Groups[1].Value;
-                string value = attr.Groups[3].Value;
+                string value = GetAttrValue(attr);
                 if (key.Equals("src", StringComparison.OrdinalIgnoreCase))
                 {
                     src = value;
@@ -1590,7 +1594,7 @@ public partial class ConsoleNode : Control, IGameConsole
             return $"[img{sizeAttr}]{resolved}[/img]";
         });
 
-        return withImages
+        string converted = withImages
             .Replace("<br>",   "\n").Replace("<BR>", "\n")
             .Replace("<b>",    "[b]").Replace("</b>", "[/b]")
             .Replace("<i>",    "[i]").Replace("</i>", "[/i]")
@@ -1598,6 +1602,23 @@ public partial class ConsoleNode : Control, IGameConsole
             .Replace("<s>",    "[s]").Replace("</s>", "[/s]")
             // Remove unsupported tags
             .Replace("<nobr>", "").Replace("</nobr>", "");
+
+        // Drop non-BBCode HTML container tags that would otherwise appear as plain text.
+        converted = _stripHtmlTagRegex.Replace(converted, string.Empty);
+        return converted;
+    }
+
+    private static string GetAttrValue(Match attr)
+    {
+        if (attr.Groups.Count < 5)
+            return string.Empty;
+        if (attr.Groups[2].Success)
+            return attr.Groups[2].Value;
+        if (attr.Groups[3].Success)
+            return attr.Groups[3].Value;
+        if (attr.Groups[4].Success)
+            return attr.Groups[4].Value;
+        return string.Empty;
     }
 
     private static void ParseImageDimension(string raw, out int value)
@@ -1678,7 +1699,7 @@ public partial class ConsoleNode : Control, IGameConsole
         foreach (Match attr in _attrRegex.Matches(attrText))
         {
             string key = attr.Groups[1].Value;
-            string value = attr.Groups[3].Value;
+            string value = GetAttrValue(attr);
             if (!string.IsNullOrEmpty(key))
                 attrs[key] = value;
         }
