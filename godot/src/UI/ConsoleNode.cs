@@ -660,18 +660,82 @@ public partial class ConsoleNode : Control, IGameConsole
             CbgSet(path, inst.X, inst.Y, inst.Width, inst.Height);
         }
 
-        // Convert remaining ERA HTML subset to BBCode.
-        string converted = HtmlToBbcode(remainingHtml);
-        if (string.IsNullOrWhiteSpace(converted))
-            return;
+        // Inline <img> in HTML_PRINT is rendered directly via AddImage instead of BBCode [img].
+        // RichTextLabel's BBCode image loader is unreliable with non-res:// file paths.
+        string body = remainingHtml ?? string.Empty;
+        int cursor = 0;
+        bool wroteAny = false;
 
-        string bbcode = converted + "\n";
-        Enqueue(() =>
+        foreach (Match img in _imgTagRegex.Matches(body))
         {
-            _richText.AppendText(bbcode);
-            _bbcodeAccum.Append(bbcode);
-            TrimBbcodeAccumIfNeeded();
-        });
+            if (img.Index > cursor)
+            {
+                string segment = body[cursor..img.Index];
+                string convertedSegment = HtmlToBbcode(segment);
+                if (!string.IsNullOrEmpty(convertedSegment))
+                {
+                    string chunk = convertedSegment;
+                    Enqueue(() =>
+                    {
+                        _richText.AppendText(chunk);
+                        _bbcodeAccum.Append(chunk);
+                        TrimBbcodeAccumIfNeeded();
+                    });
+                    wroteAny = true;
+                }
+            }
+
+            if (TryParseInlineImgTag(img.Value, out string src, out int width, out int height))
+            {
+                string resolved = ResolveImagePathForBbcode(src);
+                Enqueue(() =>
+                {
+                    Texture2D tex = LoadTexture(resolved);
+                    if (tex == null)
+                    {
+                        GD.PrintErr($"[HTML IMG] Image not found: {src} -> {resolved}");
+                        return;
+                    }
+
+                    int drawW = width > 0 ? width : tex.GetWidth();
+                    int drawH = height > 0 ? height : tex.GetHeight();
+                    _richText.AddImage(tex, drawW, drawH);
+                    // Keep the accumulator in sync length-wise for later linkify/highlight logic.
+                    _bbcodeAccum.Append(' ');
+                    TrimBbcodeAccumIfNeeded();
+                });
+                wroteAny = true;
+            }
+
+            cursor = img.Index + img.Length;
+        }
+
+        if (cursor < body.Length)
+        {
+            string tail = body[cursor..];
+            string convertedTail = HtmlToBbcode(tail);
+            if (!string.IsNullOrEmpty(convertedTail))
+            {
+                string chunk = convertedTail;
+                Enqueue(() =>
+                {
+                    _richText.AppendText(chunk);
+                    _bbcodeAccum.Append(chunk);
+                    TrimBbcodeAccumIfNeeded();
+                });
+                wroteAny = true;
+            }
+        }
+
+        if (wroteAny)
+        {
+            Enqueue(() =>
+            {
+                _richText.AppendText("\n");
+                _bbcodeAccum.Append('\n');
+                TrimBbcodeAccumIfNeeded();
+            });
+        }
     }
 
     public void PrintImage(string resourcePath, int width, int height, int align)
@@ -1780,6 +1844,28 @@ public partial class ConsoleNode : Control, IGameConsole
         return $"[img{sizeAttr}]{resolved}[/img]";
     }
 
+    private static bool TryParseInlineImgTag(string fullTag, out string src, out int width, out int height)
+    {
+        src = string.Empty;
+        width = 0;
+        height = 0;
+
+        Match match = _imgTagRegex.Match(fullTag ?? string.Empty);
+        if (!match.Success)
+            return false;
+
+        var attrs = ParseAttributes(match.Groups[1].Value);
+        if (!attrs.TryGetValue("src", out src) || string.IsNullOrWhiteSpace(src))
+            return false;
+
+        if (attrs.TryGetValue("width", out string widthRaw))
+            ParseImageDimension(widthRaw, out width);
+        if (attrs.TryGetValue("height", out string heightRaw))
+            ParseImageDimension(heightRaw, out height);
+
+        return true;
+    }
+
     private static bool TryGetFontColorBbcode(string fullTag, out string colorTag)
     {
         colorTag = null;
@@ -1842,9 +1928,15 @@ public partial class ConsoleNode : Control, IGameConsole
             return;
 
         string numeric = raw.Trim();
-        if (numeric.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+        bool isPx = numeric.EndsWith("px", StringComparison.OrdinalIgnoreCase);
+        if (isPx)
             numeric = numeric[..^2].Trim();
-        _ = int.TryParse(numeric, out value);
+        if (!int.TryParse(numeric, out int parsed))
+            return;
+
+        // Emuera MixedNum behavior: unitless values are scaled by FontSize/100,
+        // while explicit px values are treated as absolute pixels.
+        value = isPx ? parsed : parsed * EraConfig.FontSize / 100;
     }
 
     private readonly struct DivImageInstruction
@@ -1895,6 +1987,16 @@ public partial class ConsoleNode : Control, IGameConsole
                 ParseImageDimension(heightRaw, out int imgH);
                 if (imgH > 0)
                     h = imgH;
+            }
+            if (imgAttrs.TryGetValue("xpos", out string xPosRaw))
+            {
+                ParseImageDimension(xPosRaw, out int imgX);
+                x += imgX;
+            }
+            if (imgAttrs.TryGetValue("ypos", out string yPosRaw))
+            {
+                ParseImageDimension(yPosRaw, out int imgY);
+                y += imgY;
             }
 
             instructions.Add(new DivImageInstruction(src, x, y, w, h));

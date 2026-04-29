@@ -151,6 +151,18 @@ d:\Github\gemuera\
 - [ ] `AppContents` の画像キャッシュをGodot版に移植
 - [ ] アニメーションスプライト対応
 
+### 画像トラブル対策 TODO (追加: 2026-04-30)
+
+- [ ] `HTML_PRINT` の `<img>` は BBCode `[img]` 非依存を維持し、`RichTextLabel.AddImage()` 経路に統一（回帰防止テスト追加）
+- [ ] `PRINT_IMG` の描画経路も BBCode依存を見直し、外部パス/Android/Web で安定する直接テクスチャ描画へ統一検討
+- [ ] `IMG_LINE_10001` など実行時スプライト名の解決: `AppContents` で生成した画像を `ConsoleNode` 側で直接参照できる橋渡しを実装
+- [ ] `GraphicsImage` の no-op 描画API (`GDraw*`, `GFillRectangle`, `GDrawString`) を段階的に実装し、スクリプト生成画像が実際に表示される状態にする
+- [ ] `AppContents` に実画像キャッシュ（ロード済みテクスチャ再利用、破棄タイミング管理）を実装し、長時間プレイでの再ロード/メモリ肥大を抑制
+- [ ] `CBG_SetButtonMap` / `INPUTMOUSEKEY` のヒットテストを実ゲームデータで検証し、RGB取得・透明判定・座標系のズレをテストで固定化
+- [ ] `div/img` 属性互換を拡張（`xpos`/`ypos`/`rect`/`width`/`height` のMixedNum換算に加え、`srcb`/`srcm`/`display`/`depth` の扱いを仕様化）
+- [ ] 画像読み込み失敗時のログを整理し、`src`・解決後パス・呼び出し元命令 (`HTML_PRINT`/`PRINT_IMG`/`CBG*`) を必ず出力
+- [ ] Webエクスポート向けに `res://` / `user://` / 実ファイルパスの許容範囲を定義し、環境別の画像ロード戦略を文書化
+
 ## フェーズ 7 — Androidビルド
 
 - [ ] Godot Android エクスポート設定
