@@ -80,10 +80,11 @@ public partial class ConsoleNode : Control, IGameConsole
     private static readonly Regex _urlTagRegex =
         new(@"\[url=[^\]]*\].*?\[/url\]",
             RegexOptions.Singleline | RegexOptions.Compiled);
-    // Match [lb]N] plus anything after it up to newline, [lb], or a closing BBCode tag [/.
-    // Captures group 1 = number, group 2 = trailing text on the same option.
+    // Match [lb]N] (with optional leading spaces/NBSPs and optional suffix inside the bracket).
+    // Captures: group 1 = spaces before number, group 2 = number,
+    //            group 3 = suffix inside bracket (e.g. "↑"), group 4 = trailing text on the same option.
     private static readonly Regex _bracketNumRegex =
-        new(@"\[lb\](\d+)\]((?:(?!\[lb\])(?!\[/)(?!\n).)*)",
+        new(@"\[lb\]([ \u00a0]*)(\d+)([^\]\n]*)\]((?:(?!\[lb\])(?!\[/)(?!\n).)*)",
             RegexOptions.Compiled);
     // Extract [url=VALUE] values from BBCode for controller choice navigation.
     private static readonly Regex _urlValueRegex =
@@ -525,6 +526,8 @@ public partial class ConsoleNode : Control, IGameConsole
             int oldLen = full.Length;
             for (int i = 0; i < count; i++)
             {
+                // Guard: LastIndexOf with startIndex requires Length >= 2.
+                if (full.Length < 2) { full = ""; break; }
                 int nl = full.LastIndexOf('\n', full.Length - 2);
                 if (nl < 0) { full = ""; break; }
                 full = full[..(nl + 1)];
@@ -1270,10 +1273,10 @@ public partial class ConsoleNode : Control, IGameConsole
         foreach (Match m in _urlTagRegex.Matches(bbCode))
         {
             // Convert text BEFORE this url block
-            // group 1 = number, group 2 = trailing text (the option label after the [N])
+            // group 1 = leading spaces, group 2 = number, group 3 = suffix inside bracket, group 4 = trailing text
             sb.Append(_bracketNumRegex.Replace(
                 bbCode[lastIdx..m.Index],
-                match => $"[url={match.Groups[1].Value}][lb]{match.Groups[1].Value}]{match.Groups[2].Value}[/url]"));
+                match => $"[url={match.Groups[2].Value}][lb]{match.Groups[1].Value}{match.Groups[2].Value}{match.Groups[3].Value}]{match.Groups[4].Value}[/url]"));
             // Preserve existing url block unchanged
             sb.Append(m.Value);
             lastIdx = m.Index + m.Length;
@@ -1281,7 +1284,7 @@ public partial class ConsoleNode : Control, IGameConsole
         // Convert any remaining text after the last url block
         sb.Append(_bracketNumRegex.Replace(
             bbCode[lastIdx..],
-            match => $"[url={match.Groups[1].Value}][lb]{match.Groups[1].Value}]{match.Groups[2].Value}[/url]"));
+            match => $"[url={match.Groups[2].Value}][lb]{match.Groups[1].Value}{match.Groups[2].Value}{match.Groups[3].Value}]{match.Groups[4].Value}[/url]"));
         return sb.ToString();
     }
 

@@ -46,12 +46,25 @@ public partial class MainNode : Node
 
     public override void _Ready()
     {
-        // Determine exe directory — used for logs and game root
+        // Determine exe directory — used as fallback game root
         _exeDir = Path.GetDirectoryName(OS.GetExecutablePath())
             ?? AppDomain.CurrentDomain.BaseDirectory;
 
-        // Log files go next to the exe
-        string logPath = Path.Combine(_exeDir, "gemuera_runtime.log");
+        _console = GetNode<ConsoleNode>(ConsolePath);
+
+        // Resolve game root path — priority: CLI arg > Inspector export > exe dir
+        // Must happen BEFORE GemueraLogger.Init so the log lands in the game folder.
+        string resolvedRoot;
+        string cliGameRoot = GetCmdlineGameRoot();
+        if (!string.IsNullOrEmpty(cliGameRoot))
+            resolvedRoot = cliGameRoot;
+        else if (!string.IsNullOrEmpty(GameRootDir))
+            resolvedRoot = ProjectSettings.GlobalizePath(GameRootDir);
+        else
+            resolvedRoot = _exeDir;
+
+        // Log file goes into the game root so it is easy to find.
+        string logPath = Path.Combine(resolvedRoot, "gemuera_runtime.log");
         GemueraLogger.Init(logPath);
 
         // Hook unhandled C# exceptions (background threads)
@@ -62,18 +75,6 @@ public partial class MainNode : Node
             GemueraLogger.LogError($"[UnhandledException] {msg}");
             GD.PrintErr($"[Gemuera] UnhandledException: {msg}");
         };
-
-        _console = GetNode<ConsoleNode>(ConsolePath);
-
-        // Resolve game root path — priority: CLI arg > Inspector export > exe dir
-        string resolvedRoot;
-        string cliGameRoot = GetCmdlineGameRoot();
-        if (!string.IsNullOrEmpty(cliGameRoot))
-            resolvedRoot = cliGameRoot;
-        else if (!string.IsNullOrEmpty(GameRootDir))
-            resolvedRoot = ProjectSettings.GlobalizePath(GameRootDir);
-        else
-            resolvedRoot = _exeDir;
 
         GD.Print($"[Gemuera] ExeDir: {_exeDir}");
         GD.Print($"[Gemuera] Game root: {resolvedRoot}");

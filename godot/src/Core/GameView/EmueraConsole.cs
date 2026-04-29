@@ -138,7 +138,10 @@ internal sealed class EmueraConsole
         }
     }
 
-    public void Print(string str, bool lineEnd) { Print(str); if (lineEnd) NewLine(); }
+    // NOTE: lineEnd is an internal print-buffer hint in the original Emuera (PrintStringBuffer.Append lineEnd param).
+    // It does NOT mean "add a newline here". NewLine() is called explicitly by OutputToConsole when IsNewLine()/IsWaitInput() is true.
+    // Calling NewLine() here caused every PRINT to add a spurious newline, breaking multi-column output (e.g. roguelike ASCII art maps).
+    public void Print(string str, bool lineEnd) { Print(str); }
 
     public PrintStringBuffer PrintBuffer { get; } = new PrintStringBuffer();
 
