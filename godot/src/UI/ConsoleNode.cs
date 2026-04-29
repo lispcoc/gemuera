@@ -102,6 +102,16 @@ public partial class ConsoleNode : Control, IGameConsole
     private readonly List<string> _controllerChoices = new();
     // Currently highlighted choice index (-1 = none highlighted yet).
     private int _controllerChoiceIndex = -1;
+    // Whether menu highlight overlay is allowed for the current menu section.
+    // Disabled for very large sections to avoid heavy regex replacement on each D-pad move.
+    private bool _controllerHighlightEnabled;
+    // True when controller choices were intentionally truncated for safety.
+    private bool _controllerChoicesTruncated;
+
+    // Safety limits for controller choice extraction/highlight.
+    private const int MaxControllerChoices = 512;
+    private const int MaxControllerMenuChars = 250_000;
+    private const int MaxHighlightMenuChars = 120_000;
 
     // Position in _bbcodeAccum where the current menu section starts (for highlight overlay).
     private int _menuStartPos = -1;
@@ -197,6 +207,8 @@ public partial class ConsoleNode : Control, IGameConsole
                 }
                 else if (req.InputType == InputType.IntValue
                       || req.InputType == InputType.IntButton
+                        || req.InputType == InputType.StrValue
+                        || req.InputType == InputType.StrButton
                       || req.InputType == InputType.AnyValue)
                 {
                     // Submit the value shown in the input line (updated by D-pad navigation).
@@ -277,8 +289,9 @@ public partial class ConsoleNode : Control, IGameConsole
         string val = _controllerChoices[_controllerChoiceIndex];
         _inputLine.Text = val;
         _inputLine.CaretColumn = val.Length;
+        string truncated = _controllerChoicesTruncated ? "  (一部省略)" : "";
         _statusBar.Text =
-            $"[コントローラー] ▶  {val}  ({_controllerChoiceIndex + 1}/{_controllerChoices.Count})  ↑↓選択  Aで決定";
+            $"[コントローラー] ▶  {val}  ({_controllerChoiceIndex + 1}/{_controllerChoices.Count})  ↑↓選択  Aで決定{truncated}";
         UpdateHighlight();
     }
 
@@ -287,12 +300,25 @@ public partial class ConsoleNode : Control, IGameConsole
     {
         _controllerChoices.Clear();
         _controllerChoiceIndex = -1;
+        _controllerChoicesTruncated = false;
+        _controllerHighlightEnabled = bbSection.Length <= MaxHighlightMenuChars;
+
+        if (bbSection.Length > MaxControllerMenuChars)
+            return;
+
         var seen = new HashSet<string>();
-        foreach (Match m in _urlValueRegex.Matches(bbSection))
+        for (Match m = _urlValueRegex.Match(bbSection); m.Success; m = m.NextMatch())
         {
             string val = UrlDecodeBb(m.Groups[1].Value);
             if (seen.Add(val))
+            {
                 _controllerChoices.Add(val);
+                if (_controllerChoices.Count >= MaxControllerChoices)
+                {
+                    _controllerChoicesTruncated = true;
+                    break;
+                }
+            }
         }
         if (_controllerChoices.Count > 0)
         {
@@ -306,6 +332,8 @@ public partial class ConsoleNode : Control, IGameConsole
     {
         _controllerChoices.Clear();
         _controllerChoiceIndex = -1;
+        _controllerChoicesTruncated = false;
+        _controllerHighlightEnabled = false;
         _mouseHoverValue = null;
         _menuStartPos = -1;
         if (_statusBar != null) _statusBar.Text = "";
@@ -319,6 +347,18 @@ public partial class ConsoleNode : Control, IGameConsole
     /// </summary>
     private void UpdateHighlight()
     {
+        if (!_controllerHighlightEnabled)
+        {
+            if (_highlightActive)
+            {
+                _highlightActive = false;
+                int savedScroll = _scroll?.ScrollVertical ?? 0;
+                _richText.Text = _bbcodeAccum.ToString();
+                if (_scroll != null) _scroll.ScrollVertical = savedScroll;
+            }
+            return;
+        }
+
         // Mouse hover takes precedence; fall back to controller index
         string targetVal = _mouseHoverValue;
         if (targetVal == null && _controllerChoiceIndex >= 0 && _controllerChoiceIndex < _controllerChoices.Count)
@@ -840,6 +880,8 @@ public partial class ConsoleNode : Control, IGameConsole
             // Populate controller choices from the just-linkified menu section.
             if (request.InputType == InputType.IntValue
              || request.InputType == InputType.IntButton
+             || request.InputType == InputType.StrValue
+             || request.InputType == InputType.StrButton
              || request.InputType == InputType.AnyValue)
             {
                 string bb = _bbcodeAccum.ToString();

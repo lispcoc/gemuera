@@ -150,13 +150,14 @@ d:\Github\gemuera\
 マウス・キーボードなしでも基本操作を可能にするゲームパッド対応。
 
 - [x] **選択肢ナビゲーション** — D-pad ↑↓ で `[url=N]` 選択肢を循環選択、入力欄とステータスバーに反映
-- [x] **決定ボタン (A)** — IntValue / IntButton / AnyValue 入力を確定、WAIT / WAITANYKEY / AnyKey を進める
+- [x] **決定ボタン (A)** — IntValue / IntButton / StrValue / StrButton / AnyValue 入力を確定、WAIT / WAITANYKEY / AnyKey を進める
 - [x] **キャンセル / WAIT 進行 (B)** — WAIT / WAITANYKEY / AnyKey を進める
 - [x] **スクロール (D-pad ↑↓)** — 選択肢なし時はスクロールとして動作 (80px/step)
 - [x] **ページスクロール (L1/R1)** — 1画面分スクロール
 - [x] **右スティック縦軸** — `_Process()` で毎フレーム連続スクロール
 - [x] **INPUTMOUSEKEY 対応 (A)** — キー入力として MouseType=4 を返す
 - [x] **ステータスバーヒント** — 選択肢ナビ中は `▶ N (↑↓ 選択 / A 決定)` を表示
+- [x] **大量選択肢の安定化** — 選択肢抽出・ハイライトに安全上限を導入し、大規模メニューでのクラッシュを回避
 - [ ] タッチスクリーン仮想キーボード連携 (Android Phase 7 で対応予定)
 - [ ] INPUTS (文字列) 向け仮想キーボード / OSK 呼び出し
 
