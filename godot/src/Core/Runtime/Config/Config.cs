@@ -132,6 +132,12 @@ internal static class Config
 
 		#region EM_私家版_LoadText＆SaveText機能拡張
 		ValidExtension = instance.GetConfigValue<List<string>>(ConfigCode.ValidExtension);
+		// Gemuera bootstrap loads core data from XML assets, so legacy configs that only
+		// list "txt" must not disable XML file access.
+		if (!ValidExtension.Exists(ext => string.Equals(ext, "txt", StringComparison.OrdinalIgnoreCase)))
+			ValidExtension.Add("txt");
+		if (!ValidExtension.Exists(ext => string.Equals(ext, "xml", StringComparison.OrdinalIgnoreCase)))
+			ValidExtension.Add("xml");
 		#endregion
 		#region EM_私家版_セーブ圧縮
 		ZipSaveData = instance.GetConfigValue<bool>(ConfigCode.ZipSaveData);

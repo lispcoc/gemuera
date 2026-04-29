@@ -11,6 +11,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.IO;
+using MinorShift.Emuera;
 using EraConfig = MinorShift.Emuera.Runtime.Config.Config;
 
 namespace Gemuera.UI;
@@ -93,6 +95,19 @@ public partial class ConsoleNode : Control, IGameConsole
     private static readonly Regex _urlFullRegex =
         new(@"\[url=([^\]]+)\](.*?)\[/url\]",
             RegexOptions.Singleline | RegexOptions.Compiled);
+    private static readonly Regex _imgTagRegex =
+        new(@"<img\b([^>]*)>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex _divTagRegex =
+        new(@"<div\b([^>]*)>(.*?)</div>",
+            RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+    private static readonly Regex _attrRegex =
+        new("([a-zA-Z][a-zA-Z0-9_-]*)\\s*=\\s*(['\"])(.*?)\\2",
+            RegexOptions.Singleline | RegexOptions.Compiled);
+
+    private static readonly string[] _imageExtCandidates =
+        { ".png", ".jpg", ".jpeg", ".webp", ".bmp" };
+    private static readonly Dictionary<string, string> _resolvedImagePathCache =
+        new(StringComparer.OrdinalIgnoreCase);
 
     // ----------------------------------------------------------------
     // Controller / gamepad state
@@ -618,8 +633,20 @@ public partial class ConsoleNode : Control, IGameConsole
 
     public void PrintHtml(string html)
     {
-        // Convert ERA HTML subset to BBCode (basic mapping)
-        string bbcode = HtmlToBbcode(html) + "\n";
+        // Render absolutely positioned <div rect=...><img ...></div> blocks via CBG.
+        var divImages = ExtractDivImageInstructions(html, out string remainingHtml);
+        foreach (var inst in divImages)
+        {
+            string path = ResolveImagePathForBbcode(inst.Source);
+            CbgSet(path, inst.X, inst.Y, inst.Width, inst.Height);
+        }
+
+        // Convert remaining ERA HTML subset to BBCode.
+        string converted = HtmlToBbcode(remainingHtml);
+        if (string.IsNullOrWhiteSpace(converted))
+            return;
+
+        string bbcode = converted + "\n";
         Enqueue(() =>
         {
             _richText.AppendText(bbcode);
@@ -879,6 +906,79 @@ public partial class ConsoleNode : Control, IGameConsole
             return null;
         }
         return ImageTexture.CreateFromImage(img);
+    }
+
+    private static string ResolveImagePathForBbcode(string src)
+    {
+        if (string.IsNullOrWhiteSpace(src))
+            return src;
+
+        if (src.StartsWith("res://", StringComparison.OrdinalIgnoreCase)
+            || src.StartsWith("user://", StringComparison.OrdinalIgnoreCase))
+            return src;
+
+        string normalized = src.Replace('/', Path.DirectorySeparatorChar)
+            .Replace('\\', Path.DirectorySeparatorChar).Trim();
+        if (_resolvedImagePathCache.TryGetValue(normalized, out string cached))
+            return cached;
+
+        if (Path.IsPathRooted(normalized) && File.Exists(normalized))
+            return _resolvedImagePathCache[normalized] = normalized;
+
+        string withExt = Path.HasExtension(normalized) ? normalized : null;
+        string[] roots =
+        {
+            Program.ContentDir,
+            Program.ExeDir,
+        };
+
+        foreach (string root in roots)
+        {
+            if (string.IsNullOrWhiteSpace(root))
+                continue;
+
+            if (withExt != null)
+            {
+                string candidate = Path.Combine(root, withExt);
+                if (File.Exists(candidate))
+                    return _resolvedImagePathCache[normalized] = candidate;
+            }
+            else
+            {
+                string directNoExt = Path.Combine(root, normalized);
+                foreach (string ext in _imageExtCandidates)
+                {
+                    string candidate = directNoExt + ext;
+                    if (File.Exists(candidate))
+                        return _resolvedImagePathCache[normalized] = candidate;
+                }
+            }
+        }
+
+        if (!Path.HasExtension(normalized))
+        {
+            string fileStem = Path.GetFileName(normalized);
+            if (!string.IsNullOrEmpty(fileStem) && !string.IsNullOrWhiteSpace(Program.ContentDir)
+                && Directory.Exists(Program.ContentDir))
+            {
+                try
+                {
+                    foreach (string ext in _imageExtCandidates)
+                    {
+                        string pattern = fileStem + ext;
+                        string[] hits = Directory.GetFiles(Program.ContentDir, pattern, SearchOption.AllDirectories);
+                        if (hits.Length > 0)
+                            return _resolvedImagePathCache[normalized] = hits[0];
+                    }
+                }
+                catch
+                {
+                    // Fall through to the original source when recursive search is unavailable.
+                }
+            }
+        }
+
+        return _resolvedImagePathCache[normalized] = src;
     }
 
     // ---- Input ----
@@ -1457,7 +1557,40 @@ public partial class ConsoleNode : Control, IGameConsole
     /// </summary>
     private static string HtmlToBbcode(string html)
     {
-        return html
+        string withImages = _imgTagRegex.Replace(html ?? string.Empty, match =>
+        {
+            string attrText = match.Groups[1].Value;
+            string src = null;
+            int width = 0;
+            int height = 0;
+
+            foreach (Match attr in _attrRegex.Matches(attrText))
+            {
+                string key = attr.Groups[1].Value;
+                string value = attr.Groups[3].Value;
+                if (key.Equals("src", StringComparison.OrdinalIgnoreCase))
+                {
+                    src = value;
+                }
+                else if (key.Equals("width", StringComparison.OrdinalIgnoreCase))
+                {
+                    ParseImageDimension(value, out width);
+                }
+                else if (key.Equals("height", StringComparison.OrdinalIgnoreCase))
+                {
+                    ParseImageDimension(value, out height);
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(src))
+                return string.Empty;
+
+            string resolved = ResolveImagePathForBbcode(src);
+            string sizeAttr = (width > 0 && height > 0) ? $" width={width} height={height}" : string.Empty;
+            return $"[img{sizeAttr}]{resolved}[/img]";
+        });
+
+        return withImages
             .Replace("<br>",   "\n").Replace("<BR>", "\n")
             .Replace("<b>",    "[b]").Replace("</b>", "[/b]")
             .Replace("<i>",    "[i]").Replace("</i>", "[/i]")
@@ -1465,5 +1598,110 @@ public partial class ConsoleNode : Control, IGameConsole
             .Replace("<s>",    "[s]").Replace("</s>", "[/s]")
             // Remove unsupported tags
             .Replace("<nobr>", "").Replace("</nobr>", "");
+    }
+
+    private static void ParseImageDimension(string raw, out int value)
+    {
+        value = 0;
+        if (string.IsNullOrWhiteSpace(raw))
+            return;
+
+        string numeric = raw.Trim();
+        if (numeric.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+            numeric = numeric[..^2].Trim();
+        _ = int.TryParse(numeric, out value);
+    }
+
+    private readonly struct DivImageInstruction
+    {
+        public DivImageInstruction(string source, int x, int y, int width, int height)
+        {
+            Source = source;
+            X = x;
+            Y = y;
+            Width = width;
+            Height = height;
+        }
+
+        public string Source { get; }
+        public int X { get; }
+        public int Y { get; }
+        public int Width { get; }
+        public int Height { get; }
+    }
+
+    private static List<DivImageInstruction> ExtractDivImageInstructions(string html, out string remainingHtml)
+    {
+        var instructions = new List<DivImageInstruction>();
+        remainingHtml = _divTagRegex.Replace(html ?? string.Empty, match =>
+        {
+            var divAttrs = ParseAttributes(match.Groups[1].Value);
+            if (!divAttrs.TryGetValue("rect", out string rectRaw))
+                return match.Value;
+            if (!TryParseRect(rectRaw, out int x, out int y, out int w, out int h))
+                return match.Value;
+
+            Match imgMatch = _imgTagRegex.Match(match.Groups[2].Value);
+            if (!imgMatch.Success)
+                return match.Value;
+
+            var imgAttrs = ParseAttributes(imgMatch.Groups[1].Value);
+            if (!imgAttrs.TryGetValue("src", out string src) || string.IsNullOrWhiteSpace(src))
+                return match.Value;
+
+            if (imgAttrs.TryGetValue("width", out string widthRaw))
+            {
+                ParseImageDimension(widthRaw, out int imgW);
+                if (imgW > 0)
+                    w = imgW;
+            }
+            if (imgAttrs.TryGetValue("height", out string heightRaw))
+            {
+                ParseImageDimension(heightRaw, out int imgH);
+                if (imgH > 0)
+                    h = imgH;
+            }
+
+            instructions.Add(new DivImageInstruction(src, x, y, w, h));
+            return string.Empty;
+        });
+
+        return instructions;
+    }
+
+    private static Dictionary<string, string> ParseAttributes(string attrText)
+    {
+        var attrs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrEmpty(attrText))
+            return attrs;
+
+        foreach (Match attr in _attrRegex.Matches(attrText))
+        {
+            string key = attr.Groups[1].Value;
+            string value = attr.Groups[3].Value;
+            if (!string.IsNullOrEmpty(key))
+                attrs[key] = value;
+        }
+        return attrs;
+    }
+
+    private static bool TryParseRect(string rectRaw, out int x, out int y, out int width, out int height)
+    {
+        x = 0;
+        y = 0;
+        width = 0;
+        height = 0;
+        if (string.IsNullOrWhiteSpace(rectRaw))
+            return false;
+
+        string[] parts = rectRaw.Split(',');
+        if (parts.Length < 4)
+            return false;
+
+        ParseImageDimension(parts[0], out x);
+        ParseImageDimension(parts[1], out y);
+        ParseImageDimension(parts[2], out width);
+        ParseImageDimension(parts[3], out height);
+        return true;
     }
 }
