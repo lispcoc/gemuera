@@ -90,6 +90,30 @@ d:\Github\gemuera\
 - [ ] フォントファイル同梱 (Godot `FontFile` 読み込み / CJKフォント同梱 — Android/Web向け)
 - [x] 文字幅計算の実装 (`Font.get_string_size()`)
 
+### HTML-BBCode 変換カバレッジ確認 (2026-04-30)
+
+対象実装: `godot/src/UI/ConsoleNode.cs` (`PrintHtml`, `HtmlToBbcode`, `ExtractDivImageInstructions`)
+
+- [x] タグ名の大小文字混在を許容 (`<BR>`, `<Font>` 等)
+- [x] テキスト部分を BBCode エスケープして表示崩れを回避 (`[` を `[lb]` へ)
+- [x] 改行タグ: `<br>` / `<br/>` / `<br />`
+- [x] 文字装飾タグ: `<b>`, `<i>`, `<u>`, `<s>`, `<strike>`
+- [x] 色タグ: `<font color='...'>` / `</font>` (`#RRGGBB`, `#AARRGGBB`)
+- [x] 画像タグ: `<img src=... width=... height=...>` (quoted/unquoted 属性)
+- [x] 属性値の `px` 単位を寸法として解釈
+- [x] CBG向け拡張: `<div rect='x,y,w,h'><img ...></div>` を抽出して `CbgSet` へ転送
+- [x] 未対応/不要タグは除去し、内側のテキストは保持
+
+未カバー/今後対応:
+
+- [ ] `<font>` の `size` / `face` 属性
+- [ ] `<span style='...'>` の CSS 解釈
+- [ ] `<a href='...'>` のリンク変換
+- [ ] `<ruby>`, `<rt>`, `<rp>` 等の日本語組版タグ
+- [ ] ネスト不整合タグに対する厳密な復旧ルール（現状は素通し/除去ベース）
+- [ ] HTMLエンティティ (`&nbsp;`, `&lt;`, `&#NNNN;`) のデコード
+- [ ] レイアウト系属性 (`padding`, `border`, `depth`, `align`) の本格反映
+
 ## フェーズ 3 — 入力処理の実装
 
 - [x] テキスト入力 (`INPUT`/`INPUTS`) — `LineEdit`

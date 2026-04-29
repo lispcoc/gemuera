@@ -1556,56 +1556,194 @@ public partial class ConsoleNode : Control, IGameConsole
     }
 
     /// <summary>
-    /// Very basic ERA HTML → BBCode conversion for HTML_PRINT.
-    /// Full implementation belongs in Phase 2.
+    /// Convert ERA HTML subset to Godot RichTextLabel BBCode.
+    /// Unknown/unsupported tags are stripped while plain text is BBCode-escaped.
     /// </summary>
     private static string HtmlToBbcode(string html)
     {
-        string withImages = _imgTagRegex.Replace(html ?? string.Empty, match =>
-        {
-            string attrText = match.Groups[1].Value;
-            string src = null;
-            int width = 0;
-            int height = 0;
+        if (string.IsNullOrEmpty(html))
+            return string.Empty;
 
-            foreach (Match attr in _attrRegex.Matches(attrText))
+        var sb = new StringBuilder(html.Length + 64);
+        var tagRegex = new Regex(@"<[^>]+>", RegexOptions.Singleline);
+        int cursor = 0;
+
+        foreach (Match tagMatch in tagRegex.Matches(html))
+        {
+            if (tagMatch.Index > cursor)
+                sb.Append(EscapeBb(html[cursor..tagMatch.Index]));
+
+            string tag = tagMatch.Value;
+            string tagName = ExtractTagName(tag);
+            bool isClosing = tag.Length >= 3 && tag[1] == '/';
+            bool isSelfClosing = tag.EndsWith("/>", StringComparison.Ordinal);
+
+            if (tagName.Length == 0)
             {
-                string key = attr.Groups[1].Value;
-                string value = GetAttrValue(attr);
-                if (key.Equals("src", StringComparison.OrdinalIgnoreCase))
-                {
-                    src = value;
-                }
-                else if (key.Equals("width", StringComparison.OrdinalIgnoreCase))
-                {
-                    ParseImageDimension(value, out width);
-                }
-                else if (key.Equals("height", StringComparison.OrdinalIgnoreCase))
-                {
-                    ParseImageDimension(value, out height);
-                }
+                cursor = tagMatch.Index + tagMatch.Length;
+                continue;
             }
 
-            if (string.IsNullOrWhiteSpace(src))
-                return string.Empty;
+            if (tagName.Equals("br", StringComparison.OrdinalIgnoreCase))
+            {
+                sb.Append('\n');
+            }
+            else if (tagName.Equals("img", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!isClosing)
+                    sb.Append(ConvertImgTagToBbcode(tag));
+            }
+            else if (tagName.Equals("b", StringComparison.OrdinalIgnoreCase))
+            {
+                sb.Append(isClosing ? "[/b]" : "[b]");
+            }
+            else if (tagName.Equals("i", StringComparison.OrdinalIgnoreCase))
+            {
+                sb.Append(isClosing ? "[/i]" : "[i]");
+            }
+            else if (tagName.Equals("u", StringComparison.OrdinalIgnoreCase))
+            {
+                sb.Append(isClosing ? "[/u]" : "[u]");
+            }
+            else if (tagName.Equals("s", StringComparison.OrdinalIgnoreCase)
+                  || tagName.Equals("strike", StringComparison.OrdinalIgnoreCase))
+            {
+                sb.Append(isClosing ? "[/s]" : "[s]");
+            }
+            else if (tagName.Equals("font", StringComparison.OrdinalIgnoreCase))
+            {
+                if (isClosing)
+                {
+                    sb.Append("[/color]");
+                }
+                else if (TryGetFontColorBbcode(tag, out string colorTag))
+                {
+                    sb.Append(colorTag);
+                }
+            }
+            else if (tagName.Equals("p", StringComparison.OrdinalIgnoreCase)
+                  || tagName.Equals("div", StringComparison.OrdinalIgnoreCase))
+            {
+                if (isClosing)
+                    sb.Append('\n');
+            }
+            else
+            {
+                // Keep unknown tags stripped; content is preserved via escaped text pieces.
+            }
 
-            string resolved = ResolveImagePathForBbcode(src);
-            string sizeAttr = (width > 0 && height > 0) ? $" width={width} height={height}" : string.Empty;
-            return $"[img{sizeAttr}]{resolved}[/img]";
-        });
+            if (isSelfClosing && (tagName.Equals("p", StringComparison.OrdinalIgnoreCase)
+                || tagName.Equals("div", StringComparison.OrdinalIgnoreCase)))
+            {
+                sb.Append('\n');
+            }
 
-        string converted = withImages
-            .Replace("<br>",   "\n").Replace("<BR>", "\n")
-            .Replace("<b>",    "[b]").Replace("</b>", "[/b]")
-            .Replace("<i>",    "[i]").Replace("</i>", "[/i]")
-            .Replace("<u>",    "[u]").Replace("</u>", "[/u]")
-            .Replace("<s>",    "[s]").Replace("</s>", "[/s]")
-            // Remove unsupported tags
-            .Replace("<nobr>", "").Replace("</nobr>", "");
+            cursor = tagMatch.Index + tagMatch.Length;
+        }
 
-        // Drop non-BBCode HTML container tags that would otherwise appear as plain text.
-        converted = _stripHtmlTagRegex.Replace(converted, string.Empty);
+        if (cursor < html.Length)
+            sb.Append(EscapeBb(html[cursor..]));
+
+        string converted = _stripHtmlTagRegex.Replace(sb.ToString(), string.Empty);
         return converted;
+    }
+
+    private static string ExtractTagName(string tag)
+    {
+        if (string.IsNullOrEmpty(tag) || tag[0] != '<')
+            return string.Empty;
+
+        int i = 1;
+        if (i < tag.Length && tag[i] == '/')
+            i++;
+
+        while (i < tag.Length && char.IsWhiteSpace(tag[i]))
+            i++;
+
+        int start = i;
+        while (i < tag.Length && !char.IsWhiteSpace(tag[i]) && tag[i] != '>' && tag[i] != '/')
+            i++;
+
+        return i > start ? tag[start..i] : string.Empty;
+    }
+
+    private static string ConvertImgTagToBbcode(string fullTag)
+    {
+        Match match = _imgTagRegex.Match(fullTag);
+        if (!match.Success)
+            return string.Empty;
+
+        string attrText = match.Groups[1].Value;
+        string src = null;
+        int width = 0;
+        int height = 0;
+
+        foreach (Match attr in _attrRegex.Matches(attrText))
+        {
+            string key = attr.Groups[1].Value;
+            string value = GetAttrValue(attr);
+            if (key.Equals("src", StringComparison.OrdinalIgnoreCase))
+            {
+                src = value;
+            }
+            else if (key.Equals("width", StringComparison.OrdinalIgnoreCase))
+            {
+                ParseImageDimension(value, out width);
+            }
+            else if (key.Equals("height", StringComparison.OrdinalIgnoreCase))
+            {
+                ParseImageDimension(value, out height);
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(src))
+            return string.Empty;
+
+        string resolved = ResolveImagePathForBbcode(src);
+        string sizeAttr = (width > 0 && height > 0) ? $" width={width} height={height}" : string.Empty;
+        return $"[img{sizeAttr}]{resolved}[/img]";
+    }
+
+    private static bool TryGetFontColorBbcode(string fullTag, out string colorTag)
+    {
+        colorTag = null;
+        Match match = _imgTagRegex.Match(fullTag.Replace("<font", "<img", StringComparison.OrdinalIgnoreCase));
+        string attrText;
+        if (match.Success)
+        {
+            attrText = match.Groups[1].Value;
+        }
+        else
+        {
+            int start = fullTag.IndexOf(' ');
+            int end = fullTag.LastIndexOf('>');
+            if (start < 0 || end <= start)
+                return false;
+            attrText = fullTag[start..end];
+        }
+
+        foreach (Match attr in _attrRegex.Matches(attrText))
+        {
+            string key = attr.Groups[1].Value;
+            if (!key.Equals("color", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            string colorRaw = GetAttrValue(attr)?.Trim();
+            if (string.IsNullOrEmpty(colorRaw))
+                return false;
+
+            if (!colorRaw.StartsWith("#", StringComparison.Ordinal))
+                colorRaw = "#" + colorRaw;
+
+            if (Regex.IsMatch(colorRaw, "^#[0-9a-fA-F]{6}$") || Regex.IsMatch(colorRaw, "^#[0-9a-fA-F]{8}$"))
+            {
+                colorTag = $"[color={colorRaw}]";
+                return true;
+            }
+            return false;
+        }
+
+        return false;
     }
 
     private static string GetAttrValue(Match attr)
