@@ -116,6 +116,8 @@ public partial class ConsoleNode : Control, IGameConsole
     // Safety limits for BBCode growth/linkify to avoid native RichTextLabel crashes.
     private const int MaxBbcodeAccumChars = 600_000;
     private const int TrimmedBbcodeChars = 450_000;
+    private const int MaxRichTextResetChars = 220_000;
+    private const int TargetRichTextResetChars = 160_000;
     // Keep this aligned with the BBCode trim threshold so menus remain clickable
     // until the same point where we already trim the accumulator for safety.
     private const int MaxLinkifyTotalChars = MaxBbcodeAccumChars;
@@ -361,6 +363,7 @@ public partial class ConsoleNode : Control, IGameConsole
             {
                 _highlightActive = false;
                 int savedScroll = _scroll?.ScrollVertical ?? 0;
+                CompactBbcodeForRichTextReset();
                 _richText.Text = _bbcodeAccum.ToString();
                 if (_scroll != null) _scroll.ScrollVertical = savedScroll;
             }
@@ -379,12 +382,14 @@ public partial class ConsoleNode : Control, IGameConsole
             {
                 _highlightActive = false;
                 int savedScroll = _scroll?.ScrollVertical ?? 0;
+                CompactBbcodeForRichTextReset();
                 _richText.Text = _bbcodeAccum.ToString();
                 if (_scroll != null) _scroll.ScrollVertical = savedScroll;
             }
             return;
         }
 
+        CompactBbcodeForRichTextReset();
         string fullBb  = _bbcodeAccum.ToString();
         string prefix  = _menuStartPos > 0 ? fullBb[.._menuStartPos] : "";
         string menu    = fullBb[_menuStartPos..];
@@ -892,6 +897,7 @@ public partial class ConsoleNode : Control, IGameConsole
                 || request.InputType == InputType.AnyValue)
             {
                 // NOTE: _richText.Text is NOT updated by AppendText(), so we use _bbcodeAccum.
+                CompactBbcodeForRichTextReset();
                 string fullBb = _bbcodeAccum.ToString();
                 GD.Print($"[ConsoleNode] Linkify: accum.Length={fullBb.Length}, lastPos={_lastInputPos}");
                 if (_lastInputPos < fullBb.Length)
@@ -1397,6 +1403,43 @@ public partial class ConsoleNode : Control, IGameConsole
         _lastInputPos = System.Math.Max(0, _lastInputPos - cut);
         _menuStartPos = System.Math.Max(-1, _menuStartPos - cut);
         _highlightActive = false;
+    }
+
+    /// <summary>
+    /// Keep full RichTextLabel re-layouts bounded. Linkify/highlight paths call _richText.Text = ...,
+    /// which becomes unstable if we feed the native parser very large BBCode buffers.
+    /// Must be called on the main thread.
+    /// </summary>
+    private void CompactBbcodeForRichTextReset()
+    {
+        if (_bbcodeAccum.Length <= MaxRichTextResetChars)
+            return;
+
+        string full = _bbcodeAccum.ToString();
+        int preserveStart = _menuStartPos >= 0 ? _menuStartPos : _lastInputPos;
+        if (preserveStart < 0 || preserveStart > full.Length)
+            preserveStart = full.Length;
+
+        int requestedCut = full.Length - TargetRichTextResetChars;
+        if (requestedCut <= 0)
+            return;
+
+        int cutBase = System.Math.Min(requestedCut, preserveStart);
+        if (cutBase <= 0)
+            return;
+
+        int cut = full.IndexOf('\n', cutBase);
+        if (cut < 0 || cut >= full.Length)
+            cut = cutBase;
+
+        string kept = full[cut..];
+        _bbcodeAccum.Clear();
+        _bbcodeAccum.Append(kept);
+
+        _lastInputPos = System.Math.Max(0, _lastInputPos - cut);
+        _menuStartPos = _menuStartPos >= 0 ? System.Math.Max(0, _menuStartPos - cut) : -1;
+        _highlightActive = false;
+        _mouseHoverValue = null;
     }
 
     private static Color GodotColorFromArgb(int argb)

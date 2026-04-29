@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace MinorShift.Emuera;
 
@@ -179,6 +180,21 @@ internal partial class ParserMediator
 
 	private static void LogParserWarning(string message, ScriptPosition? pos, int level, string kind)
 	{
+		// Parser warnings can be extremely noisy with large game packs.
+		// Keep only the first N entries in runtime log and suppress the rest.
+		if (!Program.AnalysisMode)
+		{
+			int count = Interlocked.Increment(ref parserLogCount);
+			if (count > MaxParserLogEntries)
+			{
+				if (count == MaxParserLogEntries + 1)
+				{
+					GemueraLogger.LogWarn($"[Parser] Too many warnings. Further parser logs are suppressed after {MaxParserLogEntries} entries.");
+				}
+				return;
+			}
+		}
+
 		string location = "(position:unknown)";
 		if (pos.HasValue)
 		{
@@ -187,6 +203,9 @@ internal partial class ParserMediator
 		}
 		GemueraLogger.LogWarn($"[Parser:{kind}:L{level}] {location} {message}");
 	}
+
+	private const int MaxParserLogEntries = 200;
+	private static int parserLogCount;
 
 	[GeneratedRegex(@"(?<!\\),")]
 	private static partial Regex unEscapedCommaRegex();

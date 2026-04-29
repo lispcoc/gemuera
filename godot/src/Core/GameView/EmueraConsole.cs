@@ -209,11 +209,23 @@ internal sealed class EmueraConsole
             NewLine();
     }
 
-    public void PrintError(string str) => PrintSystemLine(str);
+    public void PrintError(string str)
+    {
+        Gemuera.GemueraLogger.LogError($"[ScriptError] {str}");
+        PrintSystemLine(str);
+    }
 
-    public void PrintErrorButton(string str, object pos, int? level = null) => PrintSystemLine(str);
+    public void PrintErrorButton(string str, object pos, int? level = null)
+    {
+        Gemuera.GemueraLogger.LogError($"[ScriptError] {str}");
+        PrintSystemLine(str);
+    }
 
-    public void PrintWarning(string str, object pos = null, int level = 0) => PrintSystemLine(str);
+    public void PrintWarning(string str, object pos = null, int level = 0)
+    {
+        Gemuera.GemueraLogger.LogWarn($"[ScriptWarning] {str}");
+        PrintSystemLine(str);
+    }
 
     public void PrintHtml(string html, bool opt = false) => _inner.PrintHtml(html);
 

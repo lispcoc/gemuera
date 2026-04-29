@@ -1201,7 +1201,7 @@ internal sealed partial class Lang
 		[Managed] public static TranslatableString AbnormalEncode { get; } = new TranslatableString("文字コード異常。文字コードを確認してください（SJIS,UTF-8推奨）");
 		[Managed] public static TranslatableString FileUsingOtherProcess { get; } = new TranslatableString("ファイル:{0}は別のプロセスで使用されています（文字コードチェックができないためUTF-8 BOMで読み込みます）");
 		[Managed] public static TranslatableString TimeLogFileLocked { get; } = new TranslatableString("time.logファイルが別のプロセスで使用されているため、起動時間の記録ができません");
-		[Managed] public static TranslatableString MethodNotFound { get; } = new TranslatableString("\"[0]\"メソッドが見つかりません");
+		[Managed] public static TranslatableString MethodNotFound { get; } = new TranslatableString("\"{0}\"メソッドが見つかりません");
 		//[Managed] public static TranslatableString { get; } = new TranslatableString("");
 		//[Managed] public static TranslatableString { get; } = new TranslatableString("");
 	}
