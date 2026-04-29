@@ -113,6 +113,14 @@ public partial class ConsoleNode : Control, IGameConsole
     private const int MaxControllerMenuChars = 250_000;
     private const int MaxHighlightMenuChars = 120_000;
 
+    // Safety limits for BBCode growth/linkify to avoid native RichTextLabel crashes.
+    private const int MaxBbcodeAccumChars = 600_000;
+    private const int TrimmedBbcodeChars = 450_000;
+    // Keep this aligned with the BBCode trim threshold so menus remain clickable
+    // until the same point where we already trim the accumulator for safety.
+    private const int MaxLinkifyTotalChars = MaxBbcodeAccumChars;
+    private const int MaxLinkifySectionChars = 180_000;
+
     // Position in _bbcodeAccum where the current menu section starts (for highlight overlay).
     private int _menuStartPos = -1;
     // Whether _richText.Text currently has a highlight overlay (differs from _bbcodeAccum).
@@ -534,12 +542,22 @@ public partial class ConsoleNode : Control, IGameConsole
     {
         if (string.IsNullOrEmpty(text)) return;
         string bbcode = ToBbcode(text, style);
-        Enqueue(() => { _richText.AppendText(bbcode); _bbcodeAccum.Append(bbcode); });
+        Enqueue(() =>
+        {
+            _richText.AppendText(bbcode);
+            _bbcodeAccum.Append(bbcode);
+            TrimBbcodeAccumIfNeeded();
+        });
     }
 
     public void PrintNewLine()
     {
-        Enqueue(() => { _richText.AppendText("\n"); _bbcodeAccum.Append('\n'); });
+        Enqueue(() =>
+        {
+            _richText.AppendText("\n");
+            _bbcodeAccum.Append('\n');
+            TrimBbcodeAccumIfNeeded();
+        });
     }
 
     public void PrintLine(string lineChar)
@@ -554,6 +572,7 @@ public partial class ConsoleNode : Control, IGameConsole
             string ruleBb = $"[color=#888888]{new string(ch, count)}[/color]\n";
             _richText.AppendText(ruleBb);
             _bbcodeAccum.Append(ruleBb);
+            TrimBbcodeAccumIfNeeded();
         });
     }
 
@@ -596,7 +615,12 @@ public partial class ConsoleNode : Control, IGameConsole
     {
         // Convert ERA HTML subset to BBCode (basic mapping)
         string bbcode = HtmlToBbcode(html) + "\n";
-        Enqueue(() => { _richText.AppendText(bbcode); _bbcodeAccum.Append(bbcode); });
+        Enqueue(() =>
+        {
+            _richText.AppendText(bbcode);
+            _bbcodeAccum.Append(bbcode);
+            TrimBbcodeAccumIfNeeded();
+        });
     }
 
     public void PrintImage(string resourcePath, int width, int height, int align)
@@ -607,7 +631,12 @@ public partial class ConsoleNode : Control, IGameConsole
         string alignTag = align switch { 1 => "center", 2 => "right", _ => "left" };
         string sizeAttr = (width > 0 && height > 0) ? $" width={width} height={height}" : "";
         string bb = $"[{alignTag}][img{sizeAttr}]{resourcePath}[/img][/{alignTag}]\n";
-        Enqueue(() => { _richText.AppendText(bb); _bbcodeAccum.Append(bb); });
+        Enqueue(() =>
+        {
+            _richText.AppendText(bb);
+            _bbcodeAccum.Append(bb);
+            TrimBbcodeAccumIfNeeded();
+        });
     }
 
     public void PrintButton(string displayText, string inputValue, StringStyle style)
@@ -623,7 +652,12 @@ public partial class ConsoleNode : Control, IGameConsole
 
         string urlBb = $"[url={UrlEncodeBb(inputValue)}]{ToBbcode(displayText, innerStyle)}[/url]";
         string bb = alignTag != null ? $"[{alignTag}]{urlBb}[/{alignTag}]" : urlBb;
-        Enqueue(() => { _richText.AppendText(bb); _bbcodeAccum.Append(bb); });
+        Enqueue(() =>
+        {
+            _richText.AppendText(bb);
+            _bbcodeAccum.Append(bb);
+            TrimBbcodeAccumIfNeeded();
+        });
     }
 
     public void SetForeColor(int argb) => _fgArgb = argb;
@@ -863,14 +897,22 @@ public partial class ConsoleNode : Control, IGameConsole
                 if (_lastInputPos < fullBb.Length)
                 {
                     string newSection = fullBb[_lastInputPos..];
-                    string converted = ConvertNumberPatterns(newSection);
-                    if (converted != newSection)
+                    bool tooLarge = fullBb.Length > MaxLinkifyTotalChars || newSection.Length > MaxLinkifySectionChars;
+                    if (tooLarge)
                     {
-                        string finalBb = string.Concat(fullBb.AsSpan(0, _lastInputPos), converted);
-                        _richText.Text = finalBb;
-                        _bbcodeAccum.Clear();
-                        _bbcodeAccum.Append(finalBb);
-                        GD.Print($"[ConsoleNode] Linkify applied, new length={finalBb.Length}");
+                        GD.Print("[ConsoleNode] Linkify skipped: section too large");
+                    }
+                    else
+                    {
+                        string converted = ConvertNumberPatterns(newSection);
+                        if (converted != newSection)
+                        {
+                            string finalBb = string.Concat(fullBb.AsSpan(0, _lastInputPos), converted);
+                            _richText.Text = finalBb;
+                            _bbcodeAccum.Clear();
+                            _bbcodeAccum.Append(finalBb);
+                            GD.Print($"[ConsoleNode] Linkify applied, new length={finalBb.Length}");
+                        }
                     }
                 }
             }
@@ -1328,6 +1370,33 @@ public partial class ConsoleNode : Control, IGameConsole
             bbCode[lastIdx..],
             match => $"[url={match.Groups[2].Value}][lb]{match.Groups[1].Value}{match.Groups[2].Value}{match.Groups[3].Value}]{match.Groups[4].Value}[/url]"));
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Keep the RichTextLabel BBCode buffer bounded to avoid large native allocations.
+    /// Must be called on the main thread.
+    /// </summary>
+    private void TrimBbcodeAccumIfNeeded()
+    {
+        if (_bbcodeAccum.Length <= MaxBbcodeAccumChars)
+            return;
+
+        int remove = _bbcodeAccum.Length - TrimmedBbcodeChars;
+        if (remove <= 0) return;
+
+        string full = _bbcodeAccum.ToString();
+        int cut = full.IndexOf('\n', remove);
+        if (cut < 0) cut = remove;
+        if (cut > full.Length) cut = full.Length;
+
+        string kept = full[cut..];
+        _bbcodeAccum.Clear();
+        _bbcodeAccum.Append(kept);
+        _richText.Text = kept;
+
+        _lastInputPos = System.Math.Max(0, _lastInputPos - cut);
+        _menuStartPos = System.Math.Max(-1, _menuStartPos - cut);
+        _highlightActive = false;
     }
 
     private static Color GodotColorFromArgb(int argb)
