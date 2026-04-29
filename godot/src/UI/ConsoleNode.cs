@@ -289,7 +289,7 @@ public partial class ConsoleNode : Control, IGameConsole
         var seen = new HashSet<string>();
         foreach (Match m in _urlValueRegex.Matches(bbSection))
         {
-            string val = m.Groups[1].Value;
+            string val = UrlDecodeBb(m.Groups[1].Value);
             if (seen.Add(val))
                 _controllerChoices.Add(val);
         }
@@ -345,7 +345,7 @@ public partial class ConsoleNode : Control, IGameConsole
         {
             string val   = m.Groups[1].Value;
             string inner = m.Groups[2].Value;
-            return val == capturedVal
+            return UrlDecodeBb(val) == capturedVal
                 ? $"[url={val}][bgcolor=#1A3A6A]{inner}[/bgcolor][/url]"
                 : m.Value;
         });
@@ -360,7 +360,7 @@ public partial class ConsoleNode : Control, IGameConsole
     private void OnMetaHoverStarted(Variant meta)
     {
         if (_controllerChoices.Count == 0) return; // no active menu
-        string val = meta.AsString();
+        string val = UrlDecodeBb(meta.AsString());
         _mouseHoverValue = val;
         int idx = _controllerChoices.IndexOf(val);
         if (idx >= 0) _controllerChoiceIndex = idx;
@@ -417,20 +417,20 @@ public partial class ConsoleNode : Control, IGameConsole
             var tcs = _inputTcs;
             bool hasPending = req != null && tcs != null && !tcs.Task.IsCompleted;
 
-            // ── Escape: open settings overlay when idle, advance WAIT when pending ─
+            // ── Escape: open settings overlay (always takes priority when settings is closed).
+            //    When settings is already visible, SettingsNode handles Escape to close it.
+            //    Only advance WAIT-type inputs when settings is already open (or unavailable).
             if (key.Keycode == Key.Escape)
             {
-                if (!hasPending)
+                // Open settings unconditionally when the overlay is not visible
+                if (_settings != null && !_settings.Visible)
                 {
-                    // No input is pending — open/close the settings screen
-                    if (_settings != null && !_settings.Visible)
-                    {
-                        GetViewport().SetInputAsHandled();
-                        ShowSettings();
-                    }
+                    GetViewport().SetInputAsHandled();
+                    ShowSettings();
                     return;
                 }
-                if (req.InputType == InputType.AnyKey || req.InputType == InputType.EnterKey)
+                // Settings already open — advance input only if there's a pending WAIT
+                if (hasPending && (req.InputType == InputType.AnyKey || req.InputType == InputType.EnterKey))
                 {
                     GetViewport().SetInputAsHandled();
                     _inputLine.Editable = false;
@@ -439,6 +439,7 @@ public partial class ConsoleNode : Control, IGameConsole
                     tcs.TrySetResult(new InputResult { Value = "" });
                     return;
                 }
+                return;
             }
 
             if (hasPending)
@@ -577,7 +578,7 @@ public partial class ConsoleNode : Control, IGameConsole
         StringStyle innerStyle = style?.Clone();
         if (innerStyle != null) innerStyle.Align = 0;
 
-        string urlBb = $"[url={EscapeBb(inputValue)}]{ToBbcode(displayText, innerStyle)}[/url]";
+        string urlBb = $"[url={UrlEncodeBb(inputValue)}]{ToBbcode(displayText, innerStyle)}[/url]";
         string bb = alignTag != null ? $"[{alignTag}]{urlBb}[/{alignTag}]" : urlBb;
         Enqueue(() => { _richText.AppendText(bb); _bbcodeAccum.Append(bb); });
     }
@@ -952,7 +953,7 @@ public partial class ConsoleNode : Control, IGameConsole
     // Handle button (URL) clicks in RichTextLabel
     private void OnMetaClicked(Variant meta)
     {
-        string val = meta.AsString();
+        string val = UrlDecodeBb(meta.AsString());
         GD.Print($"[ConsoleNode] MetaClicked: meta='{val}', pending={_pendingRequest?.InputType}, tcsNull={_inputTcs == null}, completed={_inputTcs?.Task.IsCompleted}");
         var tcs = _inputTcs;
         if (tcs == null || tcs.Task.IsCompleted) return;
@@ -1210,7 +1211,50 @@ public partial class ConsoleNode : Control, IGameConsole
 
     private static string EscapeBb(string s)
     {
-        return s.Replace("[", "[lb]");
+        // Replace '[' with [lb] so it is not interpreted as a BBCode tag.
+        // Replace leading/consecutive spaces with non-breaking spaces so that
+        // RichTextLabel does not collapse them (important for ASCII art).
+        s = s.Replace("[", "[lb]");
+        // Protect runs of 2+ spaces and leading spaces from being collapsed.
+        if (s.Contains("  ") || (s.Length > 0 && s[0] == ' '))
+        {
+            var sb2 = new StringBuilder(s.Length);
+            bool prevSpace = false;
+            for (int i = 0; i < s.Length; i++)
+            {
+                if (s[i] == ' ')
+                {
+                    // First space in a run: keep as regular space; subsequent ones → NBSP.
+                    // Also make the very first character NBSP if it is a space (prevents collapse).
+                    if (prevSpace || i == 0)
+                        sb2.Append('\u00a0');
+                    else
+                        sb2.Append(' ');
+                    prevSpace = true;
+                }
+                else
+                {
+                    sb2.Append(s[i]);
+                    prevSpace = false;
+                }
+            }
+            s = sb2.ToString();
+        }
+        return s;
+    }
+
+    /// <summary>Encode a string for safe use as a [url=…] value (spaces → %20, % → %25).</summary>
+    private static string UrlEncodeBb(string s)
+    {
+        // Escape BBCode brackets first, then percent-encode spaces so the
+        // BBCode parser is not confused by whitespace inside the attribute value.
+        return s.Replace("%", "%25").Replace("[", "%5B").Replace("]", "%5D").Replace(" ", "%20");
+    }
+
+    /// <summary>Decode a value previously encoded with UrlEncodeBb.</summary>
+    private static string UrlDecodeBb(string s)
+    {
+        return s.Replace("%20", " ").Replace("%5B", "[").Replace("%5D", "]").Replace("%25", "%");
     }
 
     /// <summary>

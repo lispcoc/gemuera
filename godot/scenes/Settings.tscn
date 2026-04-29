@@ -61,152 +61,152 @@ layout_mode = 2
 size_flags_vertical = 3
 theme_override_font_sizes/font_size = 14
 
-; ---- Tab 0: 表示 / Display ----
-[node name="表示 / Display" type="VBoxContainer" parent="Panel/VBox/Tabs"]
+; ---- Tab 0: Display ----
+[node name="Display" type="VBoxContainer" parent="Panel/VBox/Tabs"]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="FontSizeRow" type="HBoxContainer" parent="Panel/VBox/Tabs/表示 / Display"]
+[node name="FontSizeRow" type="HBoxContainer" parent="Panel/VBox/Tabs/Display"]
 layout_mode = 2
 
-[node name="FontSizeLbl" type="Label" parent="Panel/VBox/Tabs/表示 / Display/FontSizeRow"]
+[node name="FontSizeLbl" type="Label" parent="Panel/VBox/Tabs/Display/FontSizeRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "フォントサイズ / Font size"
 
-[node name="FontSizeSpin" type="SpinBox" parent="Panel/VBox/Tabs/表示 / Display/FontSizeRow"]
+[node name="FontSizeSpin" type="SpinBox" parent="Panel/VBox/Tabs/Display/FontSizeRow"]
 layout_mode = 2
 min_value = 8
 max_value = 48
 value = 18
 
-[node name="FontNameRow" type="HBoxContainer" parent="Panel/VBox/Tabs/表示 / Display"]
+[node name="FontNameRow" type="HBoxContainer" parent="Panel/VBox/Tabs/Display"]
 layout_mode = 2
 
-[node name="FontNameLbl" type="Label" parent="Panel/VBox/Tabs/表示 / Display/FontNameRow"]
+[node name="FontNameLbl" type="Label" parent="Panel/VBox/Tabs/Display/FontNameRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "フォント名 / Font name"
 
-[node name="FontNameEdit" type="LineEdit" parent="Panel/VBox/Tabs/表示 / Display/FontNameRow"]
+[node name="FontNameEdit" type="LineEdit" parent="Panel/VBox/Tabs/Display/FontNameRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "MS Gothic"
 
-[node name="ForeColorRow" type="HBoxContainer" parent="Panel/VBox/Tabs/表示 / Display"]
+[node name="ForeColorRow" type="HBoxContainer" parent="Panel/VBox/Tabs/Display"]
 layout_mode = 2
 
-[node name="ForeColorLbl" type="Label" parent="Panel/VBox/Tabs/表示 / Display/ForeColorRow"]
+[node name="ForeColorLbl" type="Label" parent="Panel/VBox/Tabs/Display/ForeColorRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "文字色 / Text color"
 
-[node name="ForeColorBtn" type="ColorPickerButton" parent="Panel/VBox/Tabs/表示 / Display/ForeColorRow"]
+[node name="ForeColorBtn" type="ColorPickerButton" parent="Panel/VBox/Tabs/Display/ForeColorRow"]
 layout_mode = 2
 color = Color(0.753, 0.753, 0.753, 1)
 
-[node name="BackColorRow" type="HBoxContainer" parent="Panel/VBox/Tabs/表示 / Display"]
+[node name="BackColorRow" type="HBoxContainer" parent="Panel/VBox/Tabs/Display"]
 layout_mode = 2
 
-[node name="BackColorLbl" type="Label" parent="Panel/VBox/Tabs/表示 / Display/BackColorRow"]
+[node name="BackColorLbl" type="Label" parent="Panel/VBox/Tabs/Display/BackColorRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "背景色 / Background color"
 
-[node name="BackColorBtn" type="ColorPickerButton" parent="Panel/VBox/Tabs/表示 / Display/BackColorRow"]
+[node name="BackColorBtn" type="ColorPickerButton" parent="Panel/VBox/Tabs/Display/BackColorRow"]
 layout_mode = 2
 color = Color(0, 0, 0, 1)
 
-[node name="FocusColorRow" type="HBoxContainer" parent="Panel/VBox/Tabs/表示 / Display"]
+[node name="FocusColorRow" type="HBoxContainer" parent="Panel/VBox/Tabs/Display"]
 layout_mode = 2
 
-[node name="FocusColorLbl" type="Label" parent="Panel/VBox/Tabs/表示 / Display/FocusColorRow"]
+[node name="FocusColorLbl" type="Label" parent="Panel/VBox/Tabs/Display/FocusColorRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "選択色 / Focus color"
 
-[node name="FocusColorBtn" type="ColorPickerButton" parent="Panel/VBox/Tabs/表示 / Display/FocusColorRow"]
+[node name="FocusColorBtn" type="ColorPickerButton" parent="Panel/VBox/Tabs/Display/FocusColorRow"]
 layout_mode = 2
 color = Color(1, 1, 0, 1)
 
-; ---- Tab 1: サウンド / Sound ----
-[node name="サウンド / Sound" type="VBoxContainer" parent="Panel/VBox/Tabs"]
+; ---- Tab 1: Sound ----
+[node name="Sound" type="VBoxContainer" parent="Panel/VBox/Tabs"]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="BgmRow" type="HBoxContainer" parent="Panel/VBox/Tabs/サウンド / Sound"]
+[node name="BgmRow" type="HBoxContainer" parent="Panel/VBox/Tabs/Sound"]
 layout_mode = 2
 
-[node name="BgmLbl" type="Label" parent="Panel/VBox/Tabs/サウンド / Sound/BgmRow"]
+[node name="BgmLbl" type="Label" parent="Panel/VBox/Tabs/Sound/BgmRow"]
 layout_mode = 2
 size_flags_horizontal = 0
 custom_minimum_size = Vector2(200, 0)
 text = "BGM音量 / BGM Volume"
 
-[node name="BgmSlider" type="HSlider" parent="Panel/VBox/Tabs/サウンド / Sound/BgmRow"]
+[node name="BgmSlider" type="HSlider" parent="Panel/VBox/Tabs/Sound/BgmRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 max_value = 100.0
 value = 80.0
 step = 1.0
 
-[node name="BgmVal" type="Label" parent="Panel/VBox/Tabs/サウンド / Sound/BgmRow"]
+[node name="BgmVal" type="Label" parent="Panel/VBox/Tabs/Sound/BgmRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(36, 0)
 horizontal_alignment = 2
 text = "80"
 
-[node name="SeRow" type="HBoxContainer" parent="Panel/VBox/Tabs/サウンド / Sound"]
+[node name="SeRow" type="HBoxContainer" parent="Panel/VBox/Tabs/Sound"]
 layout_mode = 2
 
-[node name="SeLbl" type="Label" parent="Panel/VBox/Tabs/サウンド / Sound/SeRow"]
+[node name="SeLbl" type="Label" parent="Panel/VBox/Tabs/Sound/SeRow"]
 layout_mode = 2
 size_flags_horizontal = 0
 custom_minimum_size = Vector2(200, 0)
 text = "SE音量 / SE Volume"
 
-[node name="SeSlider" type="HSlider" parent="Panel/VBox/Tabs/サウンド / Sound/SeRow"]
+[node name="SeSlider" type="HSlider" parent="Panel/VBox/Tabs/Sound/SeRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 max_value = 100.0
 value = 80.0
 step = 1.0
 
-[node name="SeVal" type="Label" parent="Panel/VBox/Tabs/サウンド / Sound/SeRow"]
+[node name="SeVal" type="Label" parent="Panel/VBox/Tabs/Sound/SeRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(36, 0)
 horizontal_alignment = 2
 text = "80"
 
-; ---- Tab 2: システム / System ----
-[node name="システム / System" type="VBoxContainer" parent="Panel/VBox/Tabs"]
+; ---- Tab 2: System ----
+[node name="System" type="VBoxContainer" parent="Panel/VBox/Tabs"]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="MaxLogRow" type="HBoxContainer" parent="Panel/VBox/Tabs/システム / System"]
+[node name="MaxLogRow" type="HBoxContainer" parent="Panel/VBox/Tabs/System"]
 layout_mode = 2
 
-[node name="MaxLogLbl" type="Label" parent="Panel/VBox/Tabs/システム / System/MaxLogRow"]
+[node name="MaxLogLbl" type="Label" parent="Panel/VBox/Tabs/System/MaxLogRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "最大ログ行数 / Max log lines"
 
-[node name="MaxLogSpin" type="SpinBox" parent="Panel/VBox/Tabs/システム / System/MaxLogRow"]
+[node name="MaxLogSpin" type="SpinBox" parent="Panel/VBox/Tabs/System/MaxLogRow"]
 layout_mode = 2
 min_value = 1000
 max_value = 100000
 step = 1000
 value = 5000
 
-[node name="DisplayReportRow" type="HBoxContainer" parent="Panel/VBox/Tabs/システム / System"]
+[node name="DisplayReportRow" type="HBoxContainer" parent="Panel/VBox/Tabs/System"]
 layout_mode = 2
 
-[node name="DisplayReportLbl" type="Label" parent="Panel/VBox/Tabs/システム / System/DisplayReportRow"]
+[node name="DisplayReportLbl" type="Label" parent="Panel/VBox/Tabs/System/DisplayReportRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 text = "ロード時にレポートを表示 / Show loading report"
 
-[node name="DisplayReportCheck" type="CheckBox" parent="Panel/VBox/Tabs/システム / System/DisplayReportRow"]
+[node name="DisplayReportCheck" type="CheckBox" parent="Panel/VBox/Tabs/System/DisplayReportRow"]
 layout_mode = 2
 
 ; ----------------------------------------------------------------

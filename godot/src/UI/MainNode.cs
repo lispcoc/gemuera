@@ -65,9 +65,12 @@ public partial class MainNode : Node
 
         _console = GetNode<ConsoleNode>(ConsolePath);
 
-        // Resolve game root path — use executable directory by default
+        // Resolve game root path — priority: CLI arg > Inspector export > exe dir
         string resolvedRoot;
-        if (!string.IsNullOrEmpty(GameRootDir))
+        string cliGameRoot = GetCmdlineGameRoot();
+        if (!string.IsNullOrEmpty(cliGameRoot))
+            resolvedRoot = cliGameRoot;
+        else if (!string.IsNullOrEmpty(GameRootDir))
             resolvedRoot = ProjectSettings.GlobalizePath(GameRootDir);
         else
             resolvedRoot = _exeDir;
@@ -260,5 +263,22 @@ public partial class MainNode : Node
                 MinorShift.Emuera.Runtime.Utils.Preload.AddToCache(filePath, lines);
             }
         });
+    }
+
+    /// <summary>
+    /// Parse --game-root &lt;path&gt; from Godot user command line args (passed after --).
+    /// Returns null if the argument is not present.
+    /// </summary>
+    private static string GetCmdlineGameRoot()
+    {
+        // OS.GetCmdlineUserArgs() returns args after the '--' separator,
+        // which are not consumed by the Godot engine itself.
+        string[] args = OS.GetCmdlineUserArgs();
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "--game-root")
+                return args[i + 1];
+        }
+        return null;
     }
 }
