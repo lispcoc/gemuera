@@ -114,6 +114,9 @@ public partial class ConsoleNode : Control, IGameConsole
         { ".png", ".jpg", ".jpeg", ".webp", ".bmp" };
     private static readonly Dictionary<string, string> _resolvedImagePathCache =
         new(StringComparer.OrdinalIgnoreCase);
+    // Texture cache: keyed by the resolved path (or sprite name for AppContents sprites).
+    private static readonly Dictionary<string, WeakReference<Texture2D>> _textureCache =
+        new(StringComparer.OrdinalIgnoreCase);
 
     // ----------------------------------------------------------------
     // Controller / gamepad state
@@ -650,21 +653,28 @@ public partial class ConsoleNode : Control, IGameConsole
         });
     }
 
-    public void PrintHtml(string html)
+    public void PrintHtml(string html, bool opt = false)
     {
-        // Render absolutely positioned <div rect=...><img ...></div> blocks via CBG.
-        var divImages = ExtractDivImageInstructions(html, out string remainingHtml);
+        // Extract all absolutely positioned <div rect=...> blocks.
+        // Image-only divs → CbgSet; divs with inner text/buttons → PrintHtmlDiv.
+        var divImages = new List<DivImageInstruction>();
+        var divTexts  = new List<DivHtmlInstruction>();
+        string remainingHtml = ExtractDivInstructions(html, divImages, divTexts);
+
         foreach (var inst in divImages)
         {
             string path = ResolveImagePathForBbcode(inst.Source);
             CbgSet(path, inst.X, inst.Y, inst.Width, inst.Height);
         }
+        foreach (var inst in divTexts)
+        {
+            PrintHtmlDiv(inst.InnerHtml, inst.X, inst.Y, inst.Width, inst.Height,
+                         inst.Depth, inst.BColor, inst.BorderPx, inst.PaddingPx);
+        }
 
         // Inline <img> in HTML_PRINT is rendered directly via AddImage instead of BBCode [img].
         // RichTextLabel's BBCode image loader is unreliable with non-res:// file paths.
-        // NOTE: We do not append a forced trailing newline here; HTML_PRINT itself is not line-ending.
-        // Render pipeline is intentionally split into HtmlToOps -> DrawOps so unsupported HTML
-        // can be routed to dedicated renderers without overloading BBCode conversion.
+        // Render pipeline: HtmlToOps -> DrawOps.
         var ops = ParseInlineHtmlRenderOps(remainingHtml);
         foreach (var op in ops)
         {
@@ -707,21 +717,153 @@ public partial class ConsoleNode : Control, IGameConsole
                 });
             }
         }
+
+        // opt=false means standalone HTML block (not inline): add trailing newline to finalize line.
+        if (!opt)
+        {
+            Enqueue(() =>
+            {
+                _richText.AppendText("\n");
+                _bbcodeAccum.Append('\n');
+                TrimBbcodeAccumIfNeeded();
+            });
+        }
+    }
+
+    public void PrintHtmlDiv(string innerHtml, int x, int y, int width, int height,
+                              int depth, string bcolor, int borderPx, int paddingPx)
+    {
+        // Capture for closure.
+        string capturedHtml = innerHtml;
+        int cx = x, cy = y, cw = width, ch = height, cdepth = depth, cborder = borderPx, cpad = paddingPx;
+        string cbcolor = bcolor;
+
+        Enqueue(() =>
+        {
+            // Outer container positioned within CbgContainer.
+            var panel = new Panel();
+            panel.Position = new Vector2(cx, cy);
+            if (cw > 0 && ch > 0)
+                panel.Size = new Vector2(cw, ch);
+            panel.ClipContents = true;
+
+            // Apply border/background styling.
+            var styleBox = new StyleBoxFlat();
+            styleBox.BgColor = new Color(0, 0, 0, 0); // transparent by default
+            if (cborder > 0 && !string.IsNullOrEmpty(cbcolor))
+            {
+                styleBox.BorderWidthTop    = cborder;
+                styleBox.BorderWidthBottom = cborder;
+                styleBox.BorderWidthLeft   = cborder;
+                styleBox.BorderWidthRight  = cborder;
+                styleBox.BorderColor = ParseHtmlColor(cbcolor);
+            }
+            panel.AddThemeStyleboxOverride("panel", styleBox);
+
+            // Z-index approximation via z_index.
+            if (cdepth != 0)
+                panel.ZIndex = cdepth;
+
+            // Inner RichTextLabel for the div content.
+            var rt = new RichTextLabel();
+            rt.BbcodeEnabled = true;
+            rt.ScrollActive  = false;
+            rt.FitContent    = true;
+            rt.AnchorsPreset = (int)LayoutPreset.FullRect;
+            if (cpad > 0)
+            {
+                rt.OffsetLeft   = cpad;
+                rt.OffsetTop    = cpad;
+                rt.OffsetRight  = -cpad;
+                rt.OffsetBottom = -cpad;
+            }
+
+            // Copy font/size from the main RichTextLabel if available.
+            if (_activeFont != null)
+                rt.AddThemeFontOverride("normal_font", _activeFont);
+            rt.AddThemeFontSizeOverride("normal_font_size", _fontSize);
+            rt.AddThemeColorOverride("default_color", GodotColorFromArgb(_fgArgb));
+
+            // Connect MetaClicked so buttons inside the div fire input.
+            rt.MetaClicked += OnMetaClicked;
+
+            panel.AddChild(rt);
+            _cbgContainer.AddChild(panel);
+
+            // Now render inner HTML into the sub-RichTextLabel.
+            // We temporarily hijack _richText to reuse the render helpers, then restore it.
+            // But that's not thread-safe. Instead, render directly.
+            RenderHtmlIntoRichText(capturedHtml, rt);
+        });
+    }
+
+    /// <summary>Render HTML content into an arbitrary RichTextLabel node using the same pipeline as PrintHtml.</summary>
+    private void RenderHtmlIntoRichText(string html, RichTextLabel target)
+    {
+        // Run the same ops pipeline but output into `target` instead of `_richText`.
+        var ops = ParseInlineHtmlRenderOps(html);
+        foreach (var op in ops)
+        {
+            if (op.Type == HtmlRenderOpType.Text)
+            {
+                if (!string.IsNullOrEmpty(op.Text))
+                    target.AppendText(op.Text);
+            }
+            else if (op.Type == HtmlRenderOpType.InlineImage)
+            {
+                string resolved = ResolveImagePathForBbcode(op.Source);
+                Texture2D tex = LoadTexture(resolved);
+                if (tex != null)
+                {
+                    int dw = op.Width  > 0 ? op.Width  : tex.GetWidth();
+                    int dh = op.Height > 0 ? op.Height : tex.GetHeight();
+                    target.AddImage(tex, dw, dh);
+                }
+                else
+                {
+                    GD.PrintErr($"[HTML DIV IMG] Image not found: {op.Source} -> {resolved}");
+                }
+            }
+        }
+    }
+
+    private static Color ParseHtmlColor(string colorStr)
+    {
+        if (string.IsNullOrWhiteSpace(colorStr))
+            return Colors.White;
+        string s = colorStr.Trim();
+        if (!s.StartsWith("#", StringComparison.Ordinal))
+            s = "#" + s;
+        try { return Color.FromString(s, Colors.White); } catch { return Colors.White; }
     }
 
     public void PrintImage(string resourcePath, int width, int height, int align)
     {
-        // Phase 2: inline image via BBCode [img] tag with optional size.
-        // Accept relative game paths too and resolve them to an existing file path.
+        // Use AddImage directly (same as HTML_PRINT inline images) to avoid BBCode [img]
+        // unreliability with non-res:// paths (especially on Web/Android).
         // Alignment: 0=left, 1=center, 2=right
-        string resolvedPath = ResolveImagePathForBbcode(resourcePath);
-        string alignTag = align switch { 1 => "center", 2 => "right", _ => "left" };
-        string sizeAttr = (width > 0 && height > 0) ? $" width={width} height={height}" : "";
-        string bb = $"[{alignTag}][img{sizeAttr}]{resolvedPath}[/img][/{alignTag}]\n";
+        string resolved = ResolveImagePathForBbcode(resourcePath);
+        int w = width, h = height, a = align;
         Enqueue(() =>
         {
-            _richText.AppendText(bb);
-            _bbcodeAccum.Append(bb);
+            Texture2D tex = LoadTexture(resolved);
+            if (tex == null)
+            {
+                GD.PrintErr($"[PRINT_IMG] Image not found: {resourcePath} -> {resolved}");
+                return;
+            }
+            int drawW = w > 0 ? w : tex.GetWidth();
+            int drawH = h > 0 ? h : tex.GetHeight();
+
+            string alignTag = a switch { 1 => "center", 2 => "right", _ => null };
+            if (alignTag != null) _richText.AppendText($"[{alignTag}]");
+            _richText.AddImage(tex, drawW, drawH);
+            if (alignTag != null) _richText.AppendText($"[/{alignTag}]");
+            _richText.AppendText("\n");
+
+            // Keep accumulator in sync (placeholder char for image, then newline)
+            _bbcodeAccum.Append(' ');
+            _bbcodeAccum.Append('\n');
             TrimBbcodeAccumIfNeeded();
         });
     }
@@ -1006,17 +1148,73 @@ public partial class ConsoleNode : Control, IGameConsole
     private static Texture2D LoadTexture(string path)
     {
         if (string.IsNullOrEmpty(path)) return null;
+
+        // Cache hit (WeakReference — texture may have been collected if no longer held)
+        if (_textureCache.TryGetValue(path, out var wr) && wr.TryGetTarget(out var cached))
+            return cached;
+
+        Texture2D tex = LoadTextureInternal(path);
+        if (tex != null)
+            _textureCache[path] = new WeakReference<Texture2D>(tex);
+        return tex;
+    }
+
+    private static Texture2D LoadTextureInternal(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return null;
+
+        // res:// Godot resource
         if (path.StartsWith("res://"))
             return GD.Load<Texture2D>(path);
-        if (!System.IO.File.Exists(path)) return null;
-        var img = new Image();
-        var err = img.Load(path);
-        if (err != Error.Ok)
+
+        // Actual file on disk
+        if (System.IO.File.Exists(path))
         {
-            GD.PrintErr($"[CBG] Image.Load failed ({err}): {path}");
-            return null;
+            var img = new Image();
+            var err = img.Load(path);
+            if (err != Error.Ok)
+            {
+                GD.PrintErr($"[LoadTexture] Image.Load failed ({err}): {path}");
+                return null;
+            }
+            return ImageTexture.CreateFromImage(img);
         }
-        return ImageTexture.CreateFromImage(img);
+
+        // AppContents sprite fallback (for GCREATE/SPRITESETG sprites like IMG_LINE_10001)
+        return TryLoadSpriteTexture(path);
+    }
+
+    private static Texture2D TryLoadSpriteTexture(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return null;
+
+        var sprite = MinorShift.Emuera.UI.Game.Image.AppContents.GetSprite(name);
+        if (sprite == null) return null;
+
+        // CroppedImage backed by a GraphicsImage  → crop from the surface
+        if (sprite is MinorShift.Emuera.UI.Game.Image.CroppedImage ci)
+        {
+            // Resource-backed sprite (loaded from file)
+            if (!string.IsNullOrEmpty(ci.ResourcePath) && System.IO.File.Exists(ci.ResourcePath))
+                return LoadTexture(ci.ResourcePath);  // recursive, will be cached by path
+
+            // GraphicsImage-backed sprite — crop region from the Godot.Image surface
+            if (ci.SourceGraphics?.GodotSurface != null)
+            {
+                var src = ci.SourceGraphics.GodotSurface;
+                var rect = ci.SourceRect;
+                Godot.Rect2I safeRect = new(
+                    Mathf.Clamp(rect.X, 0, src.GetWidth()),
+                    Mathf.Clamp(rect.Y, 0, src.GetHeight()),
+                    Mathf.Clamp(rect.Width, 0, src.GetWidth() - rect.X),
+                    Mathf.Clamp(rect.Height, 0, src.GetHeight() - rect.Y));
+                if (safeRect.Size.X <= 0 || safeRect.Size.Y <= 0) return null;
+                var cropped = src.GetRegion(safeRect);
+                return ImageTexture.CreateFromImage(cropped);
+            }
+        }
+
+        return null;
     }
 
     private static string ResolveImagePathForBbcode(string src)
@@ -1679,7 +1877,8 @@ public partial class ConsoleNode : Control, IGameConsole
         var tagRegex = new Regex(@"<[^>]+>", RegexOptions.Singleline);
         var blockAlignStack = new Stack<string>();
         var linkStack = new Stack<bool>();
-        var fontColorStack = new Stack<bool>();
+        var fontStack = new Stack<(bool color, bool size, bool face)>();
+        var spanStack = new Stack<(bool color, bool size, bool face)>();
         int cursor = 0;
 
         foreach (Match tagMatch in tagRegex.Matches(html))
@@ -1728,18 +1927,20 @@ public partial class ConsoleNode : Control, IGameConsole
             {
                 if (isClosing)
                 {
-                    bool opened = fontColorStack.Count > 0 && fontColorStack.Pop();
-                    if (opened)
-                        sb.Append("[/color]");
-                }
-                else if (TryGetFontColorBbcode(tag, out string colorTag))
-                {
-                    sb.Append(colorTag);
-                    fontColorStack.Push(true);
+                    var (colorOpened, sizeOpened, faceOpened) = fontStack.Count > 0 ? fontStack.Pop() : (false, false, false);
+                    if (sizeOpened)  sb.Append("[/font_size]");
+                    if (colorOpened) sb.Append("[/color]");
+                    if (faceOpened)  sb.Append("[/font]");
                 }
                 else
                 {
-                    fontColorStack.Push(false);
+                    bool colorOpened = TryGetFontColorBbcode(tag, out string colorTag);
+                    bool sizeOpened  = TryGetFontSizeBbcode(tag, out string sizeTag);
+                    bool faceOpened  = TryGetFontFaceBbcode(tag, out string faceTag);
+                    if (sizeOpened)  sb.Append(sizeTag);
+                    if (colorOpened) sb.Append(colorTag);
+                    if (faceOpened)  sb.Append(faceTag);
+                    fontStack.Push((colorOpened, sizeOpened, faceOpened));
                 }
             }
             else if (tagName.Equals("a", StringComparison.OrdinalIgnoreCase))
@@ -1813,6 +2014,34 @@ public partial class ConsoleNode : Control, IGameConsole
                     }
                     sb.Append('\n');
                 }
+            }
+            else if (tagName.Equals("span", StringComparison.OrdinalIgnoreCase))
+            {
+                if (isClosing)
+                {
+                    var (c, s, f) = spanStack.Count > 0 ? spanStack.Pop() : (false, false, false);
+                    if (s) sb.Append("[/font_size]");
+                    if (c) sb.Append("[/color]");
+                    if (f) sb.Append("[/font]");
+                }
+                else
+                {
+                    bool colorOpened = false, sizeOpened = false, faceOpened = false;
+                    string styleAttr = ParseTagAttributes(tag).TryGetValue("style", out string sv) ? sv : null;
+                    if (styleAttr != null)
+                    {
+                        ParseInlineCssStyle(styleAttr,
+                            out string colorTag, out string sizeTag, out string faceTag);
+                        if (sizeTag  != null) { sb.Append(sizeTag);  sizeOpened  = true; }
+                        if (colorTag != null) { sb.Append(colorTag); colorOpened = true; }
+                        if (faceTag  != null) { sb.Append(faceTag);  faceOpened  = true; }
+                    }
+                    spanStack.Push((colorOpened, sizeOpened, faceOpened));
+                }
+            }
+            else if (tagName.Equals("nobr", StringComparison.OrdinalIgnoreCase))
+            {
+                // nobr: no line-break — BBCode has no direct equivalent; just ignore the tag
             }
             else
             {
@@ -1913,6 +2142,29 @@ public partial class ConsoleNode : Control, IGameConsole
         return true;
     }
 
+    private static bool TryGetFontSizeBbcode(string fullTag, out string sizeTag)
+    {
+        sizeTag = null;
+        var attrs = ParseTagAttributes(fullTag);
+        if (!attrs.TryGetValue("size", out string sizeRaw))
+            return false;
+
+        sizeRaw = DecodeHtmlEntities(sizeRaw).Trim();
+        if (string.IsNullOrEmpty(sizeRaw))
+            return false;
+
+        // Strip "px" suffix and parse.
+        string numStr = sizeRaw.EndsWith("px", StringComparison.OrdinalIgnoreCase)
+            ? sizeRaw[..^2].TrimEnd()
+            : sizeRaw;
+        if (int.TryParse(numStr, out int size) && size > 0)
+        {
+            sizeTag = $"[font_size={size}]";
+            return true;
+        }
+        return false;
+    }
+
     private static bool TryGetFontColorBbcode(string fullTag, out string colorTag)
     {
         colorTag = null;
@@ -1933,6 +2185,62 @@ public partial class ConsoleNode : Control, IGameConsole
             return true;
         }
         return false;
+    }
+
+    private static bool TryGetFontFaceBbcode(string fullTag, out string faceTag)
+    {
+        faceTag = null;
+        var attrs = ParseTagAttributes(fullTag);
+        if (!attrs.TryGetValue("face", out string faceRaw))
+            return false;
+
+        faceRaw = DecodeHtmlEntities(faceRaw).Trim();
+        if (string.IsNullOrEmpty(faceRaw))
+            return false;
+
+        // Godot BBCode font tag: [font=FontName]
+        faceTag = $"[font={faceRaw}]";
+        return true;
+    }
+
+    private static void ParseInlineCssStyle(string style,
+        out string colorTag, out string sizeTag, out string faceTag)
+    {
+        colorTag = sizeTag = faceTag = null;
+        if (string.IsNullOrWhiteSpace(style)) return;
+
+        foreach (string declaration in style.Split(';'))
+        {
+            int colon = declaration.IndexOf(':');
+            if (colon < 0) continue;
+            string prop  = declaration[..colon].Trim().ToLowerInvariant();
+            string value = declaration[(colon + 1)..].Trim();
+
+            switch (prop)
+            {
+                case "color":
+                    if (value.Length > 0)
+                    {
+                        string cv = value.StartsWith("#") ? value : "#" + value;
+                        if (Regex.IsMatch(cv, "^#[0-9a-fA-F]{6}$") || Regex.IsMatch(cv, "^#[0-9a-fA-F]{8}$"))
+                            colorTag = $"[color={cv}]";
+                    }
+                    break;
+
+                case "font-size":
+                    string numStr = value.EndsWith("px", StringComparison.OrdinalIgnoreCase)
+                        ? value[..^2].TrimEnd() : value;
+                    if (int.TryParse(numStr, out int px) && px > 0)
+                        sizeTag = $"[font_size={px}]";
+                    break;
+
+                case "font-family":
+                    string family = value.Split(',')[0].Trim().Trim('"', '\'');
+                    if (family.Length > 0)
+                        faceTag = $"[font={family}]";
+                    break;
+            }
+        }
     }
 
     private static bool TryGetButtonValue(string fullTag, out string value)
@@ -2075,6 +2383,26 @@ public partial class ConsoleNode : Control, IGameConsole
         public int Height { get; }
     }
 
+    private sealed class DivHtmlInstruction
+    {
+        public DivHtmlInstruction(string innerHtml, int x, int y, int width, int height,
+                                   int depth, string bcolor, int borderPx, int paddingPx)
+        {
+            InnerHtml = innerHtml;
+            X = x; Y = y; Width = width; Height = height;
+            Depth = depth; BColor = bcolor; BorderPx = borderPx; PaddingPx = paddingPx;
+        }
+        public string InnerHtml { get; }
+        public int X { get; }
+        public int Y { get; }
+        public int Width { get; }
+        public int Height { get; }
+        public int Depth { get; }
+        public string BColor { get; }
+        public int BorderPx { get; }
+        public int PaddingPx { get; }
+    }
+
     private enum HtmlRenderOpType
     {
         Text,
@@ -2138,53 +2466,74 @@ public partial class ConsoleNode : Control, IGameConsole
         return ops;
     }
 
-    private static List<DivImageInstruction> ExtractDivImageInstructions(string html, out string remainingHtml)
+    /// <summary>
+    /// Extract all &lt;div rect=...&gt;...&lt;/div&gt; blocks from <paramref name="html"/>.
+    /// Divs whose sole inner content is a single &lt;img&gt; are added to <paramref name="images"/>.
+    /// All other rect-divs (text, buttons, mixed) are added to <paramref name="htmlDivs"/>.
+    /// Returns the remaining HTML with all extracted divs removed.
+    /// </summary>
+    private static string ExtractDivInstructions(string html,
+        List<DivImageInstruction> images, List<DivHtmlInstruction> htmlDivs)
     {
-        var instructions = new List<DivImageInstruction>();
-        remainingHtml = _divTagRegex.Replace(html ?? string.Empty, match =>
+        return _divTagRegex.Replace(html ?? string.Empty, match =>
         {
             var divAttrs = ParseAttributes(match.Groups[1].Value);
             if (!divAttrs.TryGetValue("rect", out string rectRaw))
-                return match.Value;
+                return match.Value;   // No rect → keep as inline HTML.
             if (!TryParseRect(rectRaw, out int x, out int y, out int w, out int h))
                 return match.Value;
 
-            Match imgMatch = _imgTagRegex.Match(match.Groups[2].Value);
-            if (!imgMatch.Success)
-                return match.Value;
+            int depth = 0;
+            if (divAttrs.TryGetValue("depth", out string depthRaw))
+                ParseImageDimension(depthRaw, out depth);
 
-            var imgAttrs = ParseAttributes(imgMatch.Groups[1].Value);
-            if (!imgAttrs.TryGetValue("src", out string src) || string.IsNullOrWhiteSpace(src))
-                return match.Value;
+            string bcolor = null;
+            if (divAttrs.TryGetValue("bcolor", out string bc) && !string.IsNullOrWhiteSpace(bc))
+                bcolor = bc.Trim();
 
-            if (imgAttrs.TryGetValue("width", out string widthRaw))
+            int borderPx = 0;
+            if (divAttrs.TryGetValue("border", out string borderRaw))
+                ParseImageDimension(borderRaw, out borderPx);
+
+            int paddingPx = 0;
+            if (divAttrs.TryGetValue("padding", out string padRaw))
+                ParseImageDimension(padRaw, out paddingPx);
+
+            string innerContent = match.Groups[2].Value.Trim();
+
+            // Check if this is purely an <img> element (CBG image overlay).
+            Match imgMatch = _imgTagRegex.Match(innerContent);
+            bool isImageOnly = imgMatch.Success &&
+                               _imgTagRegex.Replace(innerContent, string.Empty).Trim().Length == 0;
+
+            if (isImageOnly)
             {
-                ParseImageDimension(widthRaw, out int imgW);
-                if (imgW > 0)
-                    w = imgW;
-            }
-            if (imgAttrs.TryGetValue("height", out string heightRaw))
-            {
-                ParseImageDimension(heightRaw, out int imgH);
-                if (imgH > 0)
-                    h = imgH;
-            }
-            if (imgAttrs.TryGetValue("xpos", out string xPosRaw))
-            {
-                ParseImageDimension(xPosRaw, out int imgX);
-                x += imgX;
-            }
-            if (imgAttrs.TryGetValue("ypos", out string yPosRaw))
-            {
-                ParseImageDimension(yPosRaw, out int imgY);
-                y += imgY;
+                var imgAttrs = ParseAttributes(imgMatch.Groups[1].Value);
+                if (imgAttrs.TryGetValue("src", out string src) && !string.IsNullOrWhiteSpace(src))
+                {
+                    if (imgAttrs.TryGetValue("width",  out string wr)) { ParseImageDimension(wr, out int imgW); if (imgW > 0) w = imgW; }
+                    if (imgAttrs.TryGetValue("height", out string hr)) { ParseImageDimension(hr, out int imgH); if (imgH > 0) h = imgH; }
+                    if (imgAttrs.TryGetValue("xpos",   out string xr)) { ParseImageDimension(xr, out int imgX); x += imgX; }
+                    if (imgAttrs.TryGetValue("ypos",   out string yr)) { ParseImageDimension(yr, out int imgY); y += imgY; }
+
+                    images.Add(new DivImageInstruction(src, x, y, w, h));
+                    return string.Empty;
+                }
             }
 
-            instructions.Add(new DivImageInstruction(src, x, y, w, h));
+            // Non-image (or empty) div — render as positioned HTML overlay.
+            htmlDivs.Add(new DivHtmlInstruction(innerContent, x, y, w, h, depth, bcolor, borderPx, paddingPx));
             return string.Empty;
         });
+    }
 
-        return instructions;
+    // Keep for backward compat (not called externally; kept for easy rollback reference).
+    private static List<DivImageInstruction> ExtractDivImageInstructions(string html, out string remainingHtml)
+    {
+        var images = new List<DivImageInstruction>();
+        var unused = new List<DivHtmlInstruction>();
+        remainingHtml = ExtractDivInstructions(html, images, unused);
+        return images;
     }
 
     private static Dictionary<string, string> ParseAttributes(string attrText)

@@ -1,12 +1,14 @@
 // Stub types for MinorShift.Emuera.UI.Game.Image namespace.
 // Full image rendering is deferred, but basic sprite registry behavior is implemented
 // so SPRITE*/CBG* script paths can progress without always failing.
+using Godot;
 using MinorShift.Emuera;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using Bitmap = System.Drawing.Bitmap;
 
 namespace MinorShift.Emuera.UI.Game.Image;
 
@@ -28,75 +30,202 @@ internal abstract class AbstractImage : IDisposable
 }
 
 // ---------------------------------------------------------------------------
-// GraphicsImage  (GCREATE target — in-memory drawing surface stub)
+// GraphicsImage  (GCREATE target — in-memory drawing surface backed by Godot.Image)
 // ---------------------------------------------------------------------------
 
 internal sealed class GraphicsImage : AbstractImage
 {
     public readonly int ID;
-    private Bitmap _bitmap;
+    private Bitmap _stubBitmap;
     private bool _created;
+
+    // Godot.Image backing store for real pixel operations.
+    private Godot.Image _surface;
 
     public GraphicsImage(int id) { ID = id; }
 
-    public override Bitmap Bitmap { get => _bitmap; set => _bitmap = value; }
+    public override Bitmap Bitmap { get => _stubBitmap; set => _stubBitmap = value; }
     public override bool IsCreated => _created;
-    public int Width  => _bitmap?.Width  ?? 0;
-    public int Height => _bitmap?.Height ?? 0;
+    public int Width  => _surface?.GetWidth()  ?? 0;
+    public int Height => _surface?.GetHeight() ?? 0;
+
+    /// <summary>Access the underlying Godot.Image pixel surface (may be null if not created).</summary>
+    public Godot.Image GodotSurface => _surface;
 
     // Pen / Brush / Font stubs (used by GSetXxx, returned by property access)
-    public Pen       Pen    { get; private set; } = new Pen(Color.White);
-    public SolidBrush Brush { get; private set; } = new SolidBrush(Color.White);
-    public Font      Fnt    { get; private set; } = new Font("Arial", 12);
+    public System.Drawing.Pen       Pen    { get; private set; } = new System.Drawing.Pen(System.Drawing.Color.White);
+    public System.Drawing.SolidBrush Brush { get; private set; } = new System.Drawing.SolidBrush(System.Drawing.Color.White);
+    public System.Drawing.Font      Fnt    { get; private set; } = new System.Drawing.Font("Arial", 12);
     public string    Fontname  => Fnt?.Name ?? "";
     public float     Fontsize  => Fnt?.Size ?? 12f;
     public FontStyle Fontstyle => Fnt?.Style ?? FontStyle.Regular;
 
-    // Graphics operations — all no-ops in stub phase
+    // ----------------------------------------------------------------
+    // Creation / disposal
+    // ----------------------------------------------------------------
+
     public void GCreate(int w, int h, bool useGDI)
     {
-        _bitmap = new Bitmap(w, h);
+        GDispose();
+        int pw = System.Math.Max(1, w);
+        int ph = System.Math.Max(1, h);
+        _surface = Godot.Image.CreateEmpty(pw, ph, false, Godot.Image.Format.Rgba8);
+        _surface.Fill(new Godot.Color(0, 0, 0, 0));
+        _stubBitmap = new Bitmap(pw, ph);
         _created = true;
+        lock (AppContents.tempLoadedGraphicsImages)
+            AppContents.tempLoadedGraphicsImages.Add(this);
     }
 
     public void GCreateFromF(Bitmap bmp, bool useGDI)
     {
-        if (bmp == null)
+        GDispose();
+        if (bmp == null) return;
+
+        string srcPath = bmp.SourcePath;
+        if (!string.IsNullOrEmpty(srcPath) && System.IO.File.Exists(srcPath))
         {
-            _bitmap = null;
-            _created = false;
-            return;
+            var img = new Godot.Image();
+            if (img.Load(srcPath) == Error.Ok)
+            {
+                img.Convert(Godot.Image.Format.Rgba8);
+                _surface = img;
+                _stubBitmap = new Bitmap(img.GetWidth(), img.GetHeight()) { SourcePath = srcPath };
+                _created = true;
+                return;
+            }
         }
 
-        // Keep an independent instance because callers may dispose the source bitmap immediately.
-        _bitmap = new Bitmap(Math.Max(1, bmp.Width), Math.Max(1, bmp.Height))
-        {
-            SourcePath = bmp.SourcePath
-        };
+        // Fallback: create blank surface with the stub dimensions.
+        int pw = System.Math.Max(1, bmp.Width);
+        int ph = System.Math.Max(1, bmp.Height);
+        _surface = Godot.Image.CreateEmpty(pw, ph, false, Godot.Image.Format.Rgba8);
+        _stubBitmap = new Bitmap(pw, ph) { SourcePath = srcPath };
         _created = true;
     }
 
-    public void GDispose()                                     { _bitmap?.Dispose(); _bitmap = null; _created = false; }
-    public void GClear(Color c)                                { }
-    public void GClear(Color c, int x, int y, int w, int h)   { }
-    public void GResize(int w, int h)                         { }
-    public void GSetColor(Color c, int x, int y)              { }
-    public void GSetBrush(Brush b)                            { Brush = (SolidBrush)b; }
-    public void GSetFont(Font f, System.Drawing.FontStyle fs) { Fnt = f; }
-    public void GSetPen(Pen p)                                { Pen = p; }
-    public void GDashStyle(long style, long cap)              { }
-    public void GDrawString(string text, int x, int y)        { }
-    public void GDrawLine(int x1, int y1, int x2, int y2)     { }
-    public void GFillRectangle(Rectangle rect)                { }
-    public void GDrawG(GraphicsImage src, Rectangle dest, Rectangle srcRect)                 { }
-    public void GDrawG(GraphicsImage src, Rectangle dest, Rectangle srcRect, ColorMatrix cm) { }
-    public void GDrawGWithRotate(GraphicsImage src, double angle, int cx, int cy)            { }
-    public void GDrawGWithMask(GraphicsImage src, GraphicsImage mask, Point dest)            { }
-    public void GDrawCImg(ASprite img, Rectangle dest)                                       { }
-    public void GDrawCImg(ASprite img, Rectangle dest, ColorMatrix cm)                       { }
-    public EraColor GGetColor(int x, int y)                   => EraColor.Empty;
+    public void GDispose()
+    {
+        _surface = null;
+        _stubBitmap?.Dispose();
+        _stubBitmap = null;
+        _created = false;
+    }
+
+    // ----------------------------------------------------------------
+    // Drawing operations
+    // ----------------------------------------------------------------
+
+    public void GClear(System.Drawing.Color c)
+    {
+        if (_surface == null) return;
+        _surface.Fill(EraColorToGodot(c));
+    }
+
+    public void GClear(System.Drawing.Color c, int x, int y, int w, int h)
+    {
+        if (_surface == null) return;
+        _surface.FillRect(new Godot.Rect2I(x, y, w, h), EraColorToGodot(c));
+    }
+
+    public void GResize(int w, int h)
+    {
+        if (_surface == null) return;
+        _surface.Resize(System.Math.Max(1, w), System.Math.Max(1, h));
+    }
+
+    public void GSetColor(System.Drawing.Color c, int x, int y)
+    {
+        if (_surface == null) return;
+        _surface.SetPixel(x, y, EraColorToGodot(c));
+    }
+
+    public void GSetBrush(System.Drawing.Brush b)    { Brush = (System.Drawing.SolidBrush)b; }
+    public void GSetFont(System.Drawing.Font f, System.Drawing.FontStyle fs) { Fnt = f; }
+    public void GSetPen(System.Drawing.Pen p)         { Pen = p; }
+    public void GDashStyle(long style, long cap)      { }
+
+    public void GFillRectangle(System.Drawing.Rectangle rect)
+    {
+        if (_surface == null) return;
+        Godot.Color gc = (Brush != null)
+            ? EraColorToGodot(Brush.Color)
+            : new Godot.Color(0, 0, 0, 1);
+        _surface.FillRect(new Godot.Rect2I(rect.X, rect.Y, rect.Width, rect.Height), gc);
+    }
+
+    public void GDrawLine(int x1, int y1, int x2, int y2) { /* not implemented */ }
+
+    public void GDrawString(string text, int x, int y)        { /* text rendering into image not implemented */ }
+
+    public void GDrawG(GraphicsImage src, System.Drawing.Rectangle dest, System.Drawing.Rectangle srcRect)
+    {
+        if (_surface == null || src?._surface == null) return;
+        _surface.BlitRect(src._surface,
+            new Godot.Rect2I(srcRect.X, srcRect.Y, srcRect.Width, srcRect.Height),
+            new Godot.Vector2I(dest.X, dest.Y));
+    }
+
+    public void GDrawG(GraphicsImage src, System.Drawing.Rectangle dest, System.Drawing.Rectangle srcRect, ColorMatrix cm)
+    {
+        // ColorMatrix modulation not implemented — fall through to plain blit.
+        GDrawG(src, dest, srcRect);
+    }
+
+    public void GDrawGWithRotate(GraphicsImage src, double angle, int cx, int cy)
+    {
+        // Rotation into image not implemented.
+    }
+
+    public void GDrawGWithMask(GraphicsImage src, GraphicsImage mask, System.Drawing.Point dest)
+    {
+        if (_surface == null || src?._surface == null) return;
+        var full = new Godot.Rect2I(0, 0, src._surface.GetWidth(), src._surface.GetHeight());
+        _surface.BlitRect(src._surface, full, new Godot.Vector2I(dest.X, dest.Y));
+    }
+
+    public void GDrawCImg(ASprite img, System.Drawing.Rectangle dest)
+    {
+        if (_surface == null || img == null) return;
+        if (img is IResourceBackedSprite rbs)
+        {
+            string path = rbs.ResourcePath;
+            if (!string.IsNullOrEmpty(path) && System.IO.File.Exists(path))
+            {
+                var src = new Godot.Image();
+                if (src.Load(path) == Error.Ok)
+                {
+                    src.Convert(Godot.Image.Format.Rgba8);
+                    _surface.BlitRect(src,
+                        new Godot.Rect2I(0, 0, src.GetWidth(), src.GetHeight()),
+                        new Godot.Vector2I(dest.X, dest.Y));
+                }
+            }
+        }
+    }
+
+    public void GDrawCImg(ASprite img, System.Drawing.Rectangle dest, ColorMatrix cm)
+    {
+        GDrawCImg(img, dest);
+    }
+
+    public EraColor GGetColor(int x, int y)
+    {
+        if (_surface == null) return EraColor.Empty;
+        if (x < 0 || y < 0 || x >= _surface.GetWidth() || y >= _surface.GetHeight()) return EraColor.Empty;
+        var c = _surface.GetPixel(x, y);
+        return EraColor.FromArgb(
+            (int)(c.A * 255), (int)(c.R * 255), (int)(c.G * 255), (int)(c.B * 255));
+    }
 
     public override void Dispose() => GDispose();
+
+    // ----------------------------------------------------------------
+    // Utility
+    // ----------------------------------------------------------------
+
+    private static Godot.Color EraColorToGodot(System.Drawing.Color c)
+        => new Godot.Color(c.R / 255f, c.G / 255f, c.B / 255f, c.A / 255f);
 }
 
 // ---------------------------------------------------------------------------
@@ -123,23 +252,29 @@ internal sealed class CroppedImage : ASprite, IResourceBackedSprite
     private readonly Size _size;
     public string ResourcePath { get; }
 
-    public CroppedImage(GraphicsImage src, Rectangle rect)
+    // Optional: source GraphicsImage and the region to crop from it.
+    public GraphicsImage SourceGraphics { get; }
+    public System.Drawing.Rectangle SourceRect { get; }
+
+    public CroppedImage(GraphicsImage src, System.Drawing.Rectangle rect)
     {
-        _size = new Size(Math.Max(0, rect.Width), Math.Max(0, rect.Height));
+        SourceGraphics = src;
+        SourceRect = rect;
+        _size = new Size(System.Math.Max(0, rect.Width), System.Math.Max(0, rect.Height));
         ResourcePath = string.Empty;
     }
 
     public CroppedImage(string resourcePath, int width, int height)
     {
         ResourcePath = resourcePath ?? string.Empty;
-        _size = new Size(Math.Max(1, width), Math.Max(1, height));
+        _size = new Size(System.Math.Max(1, width), System.Math.Max(1, height));
     }
 
     public override bool IsCreated => _size.Width > 0 && _size.Height > 0;
     public override Size DestBaseSize => _size;
     public override Point DestBasePosition { get => _pos; set => _pos = value; }
     public override EraColor SpriteGetColor(int x, int y) => EraColor.Empty;
-    public override void AddFrame(GraphicsImage g, Rectangle rect, Point offset, int delay) { }
+    public override void AddFrame(GraphicsImage g, System.Drawing.Rectangle rect, Point offset, int delay) { }
     public override void Dispose() { }
 }
 
@@ -152,7 +287,7 @@ internal sealed class SpriteAnime : ASprite
     public override Size DestBaseSize => _size;
     public override Point DestBasePosition { get => _pos; set => _pos = value; }
     public override EraColor SpriteGetColor(int x, int y) => EraColor.Empty;
-    public override void AddFrame(GraphicsImage g, Rectangle rect, Point offset, int delay) { }
+    public override void AddFrame(GraphicsImage g, System.Drawing.Rectangle rect, Point offset, int delay) { }
     public override void Dispose() { }
 }
 
@@ -248,7 +383,7 @@ internal static class AppContents
         return sprite;
     }
 
-    public static void CreateSpriteG(string imgName, GraphicsImage parent, Rectangle rect)
+    public static void CreateSpriteG(string imgName, GraphicsImage parent, System.Drawing.Rectangle rect)
     {
         if (string.IsNullOrWhiteSpace(imgName) || parent == null || !parent.IsCreated)
             return;

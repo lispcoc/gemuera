@@ -35,11 +35,15 @@
 - `<br>`
 - `<b>`, `<i>`, `<u>`, `<s>/<strike>`
 - `<font color=...>`
-- `<a href=...>`
+- `<font size=...>` → `[font_size=N]`
+- `<a href='...'>` のリンク変換
 - `<button value=...>`, `<nonbutton>`
 - `<p>/<div align='center|right'>`
 - `<img ...>`（インライン: `InlineImageOp`）
 - `<div rect=...><img ...></div>`（CBG前処理）
+- `<div rect=...>text/buttons...</div>`（位置指定 RichTextLabel オーバーレイ: `PrintHtmlDiv`）
+- `HTML_PRINT opt` パラメータ（opt=false で末尾改行付与）
+- `depth`/`border`/`bcolor`/`padding` 属性の基本反映（`PrintHtmlDiv`）
 
 ### 未対応（今後）
 - `<font size=...>`, `<font face=...>`

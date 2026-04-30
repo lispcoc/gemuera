@@ -269,11 +269,14 @@ internal sealed class EmueraConsole
         PrintSystemLine(str);
     }
 
-    public void PrintHtml(string html, bool opt = false) => _inner.PrintHtml(html);
+    public void PrintHtml(string html, bool opt = false) => _inner.PrintHtml(html, opt);
 
     public void PrintHTMLIsland(string str) { }
 
     public void ClearHTMLIsland() { }
+
+    public void PrintHtmlDiv(string innerHtml, int x, int y, int width, int height, int depth, string bcolor, int borderPx, int paddingPx)
+        => _inner.PrintHtmlDiv(innerHtml, x, y, width, height, depth, bcolor, borderPx, paddingPx);
 
     public void PrintImg(string name, string nameb, string namem, MixedNum height, MixedNum width, MixedNum depth)
     {

@@ -33,8 +33,15 @@ public interface IGameConsole
     /// <summary>CLEARSCREEN / CLS — clear all displayed lines.</summary>
     void ClearScreen();
 
-    /// <summary>HTML_PRINT — output a line of HTML-subset markup.</summary>
-    void PrintHtml(string html);
+    /// <summary>HTML_PRINT — output a line of HTML-subset markup.
+    /// opt=false (default): flush pending inline content, render as a standalone display block.
+    /// opt=true: render inline (toPrintBuffer mode), no forced trailing newline.</summary>
+    void PrintHtml(string html, bool opt = false);
+
+    /// <summary>Render an absolutely positioned HTML div overlay.
+    /// Created from <div rect='x,y,w,h'> elements extracted from HTML_PRINT content.
+    /// innerHtml is the raw HTML content inside the div.</summary>
+    void PrintHtmlDiv(string innerHtml, int x, int y, int width, int height, int depth, string bcolor, int borderPx, int paddingPx);
 
     /// <summary>PRINT_IMG / GCREATE — display an image inline.</summary>
     void PrintImage(string resourcePath, int width, int height, int align);

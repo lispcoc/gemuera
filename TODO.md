@@ -111,15 +111,20 @@ d:\Github\gemuera\
 
 未カバー/今後対応:
 
-- [ ] `<font>` の `size` / `face` 属性
-- [ ] `<span style='...'>` の CSS 解釈
+   - [x] `<font>` の `size` / `face` 属性
+   - [x] `<span style='...'>` の CSS 解釈
 - [x] `<a href='...'>` のリンク変換
 - [ ] `ButtonOp` / `BlockAlignOp` / `SpanStyleOp` など専用 RenderOp の段階追加
+- [x] `<font size=...>` 属性 (`[font_size=N]` BBCode)
+   - [x] `<font face=...>` 属性
 - [ ] `<ruby>`, `<rt>`, `<rp>` 等の日本語組版タグ
 - [ ] ネスト不整合タグに対する厳密な復旧ルール（現状は素通し/除去ベース）
 - [x] HTMLエンティティ (`&nbsp;`, `&lt;`, `&#NNNN;`) のデコード
-- [ ] レイアウト系属性 (`padding`, `border`, `depth`) の本格反映
+- [x] レイアウト系属性 `depth`/`border`/`bcolor`/`padding` — `PrintHtmlDiv` で基本実装済み
 - [x] `<p align='center|right'>` の基本反映
+- [x] `<div rect=...>` 内が `<img>` のみ → `CbgSet` (既存)
+- [x] `<div rect=...>` 内がテキスト/ボタン等 → `PrintHtmlDiv` 位置指定 RichTextLabel オーバーレイ（新規）
+- [x] `HTML_PRINT opt` パラメータを `IGameConsole.PrintHtml(html, opt)` 経由で反映（opt=false 時に末尾改行付与）
 
 ## フェーズ 3 — 入力処理の実装
 
@@ -161,9 +166,9 @@ d:\Github\gemuera\
 ### 画像トラブル対策 TODO (追加: 2026-04-30)
 
 - [ ] `HTML_PRINT` の `<img>` は BBCode `[img]` 非依存を維持し、`RichTextLabel.AddImage()` 経路に統一（回帰防止テスト追加）
-- [ ] `PRINT_IMG` の描画経路も BBCode依存を見直し、外部パス/Android/Web で安定する直接テクスチャ描画へ統一検討
-- [ ] `IMG_LINE_10001` など実行時スプライト名の解決: `AppContents` で生成した画像を `ConsoleNode` 側で直接参照できる橋渡しを実装
-- [ ] `GraphicsImage` の no-op 描画API (`GDraw*`, `GFillRectangle`, `GDrawString`) を段階的に実装し、スクリプト生成画像が実際に表示される状態にする
+   - [x] `PRINT_IMG` の描画経路も BBCode依存を見直し、外部パス/Android/Web で安定する直接テクスチャ描画へ統一検討
+   - [x] `IMG_LINE_10001` など実行時スプライト名の解決: `AppContents` で生成した画像を `ConsoleNode` 側で直接参照できる橋渡しを実装
+   - [x] `GraphicsImage` の no-op 描画API (`GDraw*`, `GFillRectangle`, `GDrawString`) を段階的に実装し、スクリプト生成画像が実際に表示される状態にする
 - [ ] `AppContents` に実画像キャッシュ（ロード済みテクスチャ再利用、破棄タイミング管理）を実装し、長時間プレイでの再ロード/メモリ肥大を抑制
 - [ ] `CBG_SetButtonMap` / `INPUTMOUSEKEY` のヒットテストを実ゲームデータで検証し、RGB取得・透明判定・座標系のズレをテストで固定化
 - [ ] `div/img` 属性互換を拡張（`xpos`/`ypos`/`rect`/`width`/`height` のMixedNum換算に加え、`srcb`/`srcm`/`display`/`depth` の扱いを仕様化）
