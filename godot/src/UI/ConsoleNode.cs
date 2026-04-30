@@ -905,10 +905,11 @@ public partial class ConsoleNode : Control, IGameConsole
         Enqueue(() =>
         {
             if (string.IsNullOrEmpty(resourcePath)) return;
-            var texture = LoadTexture(resourcePath);
+            string resolved = ResolveImagePathForBbcode(resourcePath);
+            var texture = LoadTexture(resolved);
             if (texture == null)
             {
-                GD.PrintErr($"[CBG] Image not found: {resourcePath}");
+                GD.PrintErr($"[CBG] Image not found: {resourcePath} -> {resolved}");
                 return;
             }
             var rect = new TextureRect();
@@ -1264,26 +1265,36 @@ public partial class ConsoleNode : Control, IGameConsole
             }
         }
 
-        if (!Path.HasExtension(normalized))
+        string fileName = Path.GetFileName(normalized);
+        if (!string.IsNullOrEmpty(fileName))
         {
-            string fileStem = Path.GetFileName(normalized);
-            if (!string.IsNullOrEmpty(fileStem) && !string.IsNullOrWhiteSpace(Program.ContentDir)
-                && Directory.Exists(Program.ContentDir))
+            try
             {
-                try
+                foreach (string root in roots)
                 {
-                    foreach (string ext in _imageExtCandidates)
+                    if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+                        continue;
+
+                    if (Path.HasExtension(normalized))
                     {
-                        string pattern = fileStem + ext;
-                        string[] hits = Directory.GetFiles(Program.ContentDir, pattern, SearchOption.AllDirectories);
+                        string[] hits = Directory.GetFiles(root, fileName, SearchOption.AllDirectories);
                         if (hits.Length > 0)
                             return _resolvedImagePathCache[normalized] = hits[0];
                     }
+                    else
+                    {
+                        foreach (string ext in _imageExtCandidates)
+                        {
+                            string[] hits = Directory.GetFiles(root, fileName + ext, SearchOption.AllDirectories);
+                            if (hits.Length > 0)
+                                return _resolvedImagePathCache[normalized] = hits[0];
+                        }
+                    }
                 }
-                catch
-                {
-                    // Fall through to the original source when recursive search is unavailable.
-                }
+            }
+            catch
+            {
+                // Fall through to the original source when recursive search is unavailable.
             }
         }
 

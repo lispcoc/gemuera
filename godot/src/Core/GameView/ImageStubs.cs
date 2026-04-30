@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Text.RegularExpressions;
 using Bitmap = System.Drawing.Bitmap;
 
 namespace MinorShift.Emuera.UI.Game.Image;
@@ -335,6 +336,74 @@ internal static class AppContents
         return g;
     }
 
+    private static readonly Regex _tailNumberRegex = new(@"^(.*)_(\d+)$", RegexOptions.Compiled);
+    private static readonly Regex _middleNumberRegex = new(@"^(.*)_(\d+)_(.*)$", RegexOptions.Compiled);
+
+    private static IEnumerable<string> BuildStemCandidates(string stem)
+    {
+        if (string.IsNullOrWhiteSpace(stem))
+            yield break;
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        bool Add(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return false;
+            return seen.Add(value);
+        }
+
+        if (Add(stem)) yield return stem;
+
+        string noNormal = stem.Replace("_通常", string.Empty, StringComparison.Ordinal);
+        if (Add(noNormal)) yield return noNormal;
+
+        string eyeAlias = noNormal.Replace("瞳", "目", StringComparison.Ordinal);
+        if (Add(eyeAlias)) yield return eyeAlias;
+
+        Match mTail = _tailNumberRegex.Match(eyeAlias);
+        if (mTail.Success && int.TryParse(mTail.Groups[2].Value, out int nTail))
+        {
+            string head = mTail.Groups[1].Value;
+            string padded = $"{head}_{nTail:00}";
+            if (Add(padded)) yield return padded;
+
+            string paddedNext = $"{head}_{nTail + 1:00}";
+            if (Add(paddedNext)) yield return paddedNext;
+
+            string compact = head + nTail.ToString();
+            if (Add(compact)) yield return compact;
+        }
+
+        Match mMid = _middleNumberRegex.Match(eyeAlias);
+        if (mMid.Success && int.TryParse(mMid.Groups[2].Value, out int nMid))
+        {
+            string head = mMid.Groups[1].Value;
+            string tail = mMid.Groups[3].Value;
+            string compactMid = $"{head}{nMid}_{tail}";
+            if (Add(compactMid)) yield return compactMid;
+
+            string compactMidPadded = $"{head}{nMid:00}_{tail}";
+            if (Add(compactMidPadded)) yield return compactMidPadded;
+        }
+    }
+
+    private static string FindByFilenameRecursive(string root, string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(root) || string.IsNullOrWhiteSpace(fileName) || !Directory.Exists(root))
+            return null;
+
+        try
+        {
+            string[] hits = Directory.GetFiles(root, fileName, SearchOption.AllDirectories);
+            return hits.Length > 0 ? hits[0] : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static string ResolveSpritePath(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -346,20 +415,70 @@ internal static class AppContents
         if (Path.IsPathRooted(normalized) && File.Exists(normalized))
             return normalized;
 
-        if (Path.HasExtension(normalized))
+        string[] roots =
         {
-            string candidate = Path.Combine(Program.ContentDir, normalized);
-            if (File.Exists(candidate))
-                return candidate;
-        }
-        else
+            Program.ContentDir,
+            Program.ExeDir,
+        };
+
+        bool hasExt = Path.HasExtension(normalized);
+        string dirPart = Path.GetDirectoryName(normalized) ?? string.Empty;
+        string stem = hasExt ? Path.GetFileNameWithoutExtension(normalized) : Path.GetFileName(normalized);
+        string ext = hasExt ? Path.GetExtension(normalized) : string.Empty;
+
+        foreach (string root in roots)
         {
-            string basePath = Path.Combine(Program.ContentDir, normalized);
-            foreach (string ext in _spriteExts)
+            if (string.IsNullOrWhiteSpace(root))
+                continue;
+
+            if (hasExt)
             {
-                string candidate = basePath + ext;
-                if (File.Exists(candidate))
-                    return candidate;
+                string direct = Path.Combine(root, normalized);
+                if (File.Exists(direct))
+                    return direct;
+            }
+            else
+            {
+                string directNoExt = Path.Combine(root, normalized);
+                foreach (string spriteExt in _spriteExts)
+                {
+                    string candidate = directNoExt + spriteExt;
+                    if (File.Exists(candidate))
+                        return candidate;
+                }
+            }
+
+            foreach (string stemCandidate in BuildStemCandidates(stem))
+            {
+                if (hasExt)
+                {
+                    string relFile = string.IsNullOrEmpty(dirPart)
+                        ? stemCandidate + ext
+                        : Path.Combine(dirPart, stemCandidate + ext);
+                    string rooted = Path.Combine(root, relFile);
+                    if (File.Exists(rooted))
+                        return rooted;
+
+                    string recursiveHit = FindByFilenameRecursive(root, stemCandidate + ext);
+                    if (recursiveHit != null)
+                        return recursiveHit;
+                }
+                else
+                {
+                    foreach (string spriteExt in _spriteExts)
+                    {
+                        string relFile = string.IsNullOrEmpty(dirPart)
+                            ? stemCandidate + spriteExt
+                            : Path.Combine(dirPart, stemCandidate + spriteExt);
+                        string rooted = Path.Combine(root, relFile);
+                        if (File.Exists(rooted))
+                            return rooted;
+
+                        string recursiveHit = FindByFilenameRecursive(root, stemCandidate + spriteExt);
+                        if (recursiveHit != null)
+                            return recursiveHit;
+                    }
+                }
             }
         }
 

@@ -20,7 +20,7 @@ config/icon="res://assets/icon.svg"
 
 window/size/viewport_width=800
 window/size/viewport_height=600
-window/stretch/mode="canvas_items"
+window/stretch/mode="disabled"
 window/stretch/aspect="keep_width"
 window/handheld/orientation="landscape"
 
