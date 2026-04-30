@@ -662,31 +662,32 @@ public partial class ConsoleNode : Control, IGameConsole
 
         // Inline <img> in HTML_PRINT is rendered directly via AddImage instead of BBCode [img].
         // RichTextLabel's BBCode image loader is unreliable with non-res:// file paths.
-        string body = remainingHtml ?? string.Empty;
-        int cursor = 0;
-        bool wroteAny = false;
-
-        foreach (Match img in _imgTagRegex.Matches(body))
+        // NOTE: We do not append a forced trailing newline here; HTML_PRINT itself is not line-ending.
+        // Render pipeline is intentionally split into HtmlToOps -> DrawOps so unsupported HTML
+        // can be routed to dedicated renderers without overloading BBCode conversion.
+        var ops = ParseInlineHtmlRenderOps(remainingHtml);
+        foreach (var op in ops)
         {
-            if (img.Index > cursor)
+            if (op.Type == HtmlRenderOpType.Text)
             {
-                string segment = body[cursor..img.Index];
-                string convertedSegment = HtmlToBbcode(segment);
-                if (!string.IsNullOrEmpty(convertedSegment))
+                if (string.IsNullOrEmpty(op.Text))
+                    continue;
+
+                string chunk = op.Text;
+                Enqueue(() =>
                 {
-                    string chunk = convertedSegment;
-                    Enqueue(() =>
-                    {
-                        _richText.AppendText(chunk);
-                        _bbcodeAccum.Append(chunk);
-                        TrimBbcodeAccumIfNeeded();
-                    });
-                    wroteAny = true;
-                }
+                    _richText.AppendText(chunk);
+                    _bbcodeAccum.Append(chunk);
+                    TrimBbcodeAccumIfNeeded();
+                });
+                continue;
             }
 
-            if (TryParseInlineImgTag(img.Value, out string src, out int width, out int height))
+            if (op.Type == HtmlRenderOpType.InlineImage)
             {
+                string src = op.Source;
+                int width = op.Width;
+                int height = op.Height;
                 string resolved = ResolveImagePathForBbcode(src);
                 Enqueue(() =>
                 {
@@ -704,37 +705,7 @@ public partial class ConsoleNode : Control, IGameConsole
                     _bbcodeAccum.Append(' ');
                     TrimBbcodeAccumIfNeeded();
                 });
-                wroteAny = true;
             }
-
-            cursor = img.Index + img.Length;
-        }
-
-        if (cursor < body.Length)
-        {
-            string tail = body[cursor..];
-            string convertedTail = HtmlToBbcode(tail);
-            if (!string.IsNullOrEmpty(convertedTail))
-            {
-                string chunk = convertedTail;
-                Enqueue(() =>
-                {
-                    _richText.AppendText(chunk);
-                    _bbcodeAccum.Append(chunk);
-                    TrimBbcodeAccumIfNeeded();
-                });
-                wroteAny = true;
-            }
-        }
-
-        if (wroteAny)
-        {
-            Enqueue(() =>
-            {
-                _richText.AppendText("\n");
-                _bbcodeAccum.Append('\n');
-                TrimBbcodeAccumIfNeeded();
-            });
         }
     }
 
@@ -1706,6 +1677,9 @@ public partial class ConsoleNode : Control, IGameConsole
 
         var sb = new StringBuilder(html.Length + 64);
         var tagRegex = new Regex(@"<[^>]+>", RegexOptions.Singleline);
+        var blockAlignStack = new Stack<string>();
+        var linkStack = new Stack<bool>();
+        var fontColorStack = new Stack<bool>();
         int cursor = 0;
 
         foreach (Match tagMatch in tagRegex.Matches(html))
@@ -1754,29 +1728,91 @@ public partial class ConsoleNode : Control, IGameConsole
             {
                 if (isClosing)
                 {
-                    sb.Append("[/color]");
+                    bool opened = fontColorStack.Count > 0 && fontColorStack.Pop();
+                    if (opened)
+                        sb.Append("[/color]");
                 }
                 else if (TryGetFontColorBbcode(tag, out string colorTag))
                 {
                     sb.Append(colorTag);
+                    fontColorStack.Push(true);
+                }
+                else
+                {
+                    fontColorStack.Push(false);
                 }
             }
             else if (tagName.Equals("a", StringComparison.OrdinalIgnoreCase))
             {
                 if (isClosing)
                 {
-                    sb.Append("[/url]");
+                    bool opened = linkStack.Count > 0 && linkStack.Pop();
+                    if (opened)
+                        sb.Append("[/url]");
                 }
                 else if (TryGetAnchorUrl(tag, out string href))
                 {
                     sb.Append($"[url={UrlEncodeBb(href)}]");
+                    linkStack.Push(true);
+                }
+                else
+                {
+                    linkStack.Push(false);
+                }
+            }
+            else if (tagName.Equals("button", StringComparison.OrdinalIgnoreCase))
+            {
+                if (isClosing)
+                {
+                    bool opened = linkStack.Count > 0 && linkStack.Pop();
+                    if (opened)
+                        sb.Append("[/url]");
+                }
+                else if (TryGetButtonValue(tag, out string val))
+                {
+                    sb.Append($"[url={UrlEncodeBb(val)}]");
+                    linkStack.Push(true);
+                }
+                else
+                {
+                    linkStack.Push(false);
+                }
+            }
+            else if (tagName.Equals("nonbutton", StringComparison.OrdinalIgnoreCase))
+            {
+                if (isClosing)
+                {
+                    if (linkStack.Count > 0)
+                        linkStack.Pop();
+                }
+                else
+                {
+                    linkStack.Push(false);
                 }
             }
             else if (tagName.Equals("p", StringComparison.OrdinalIgnoreCase)
                   || tagName.Equals("div", StringComparison.OrdinalIgnoreCase))
             {
+                if (!isClosing && TryGetParagraphAlignTag(tag, out string alignTag))
+                {
+                    sb.Append($"[{alignTag}]");
+                    blockAlignStack.Push(alignTag);
+                }
+                else if (!isClosing)
+                {
+                    blockAlignStack.Push(string.Empty);
+                }
+
                 if (isClosing)
+                {
+                    if (blockAlignStack.Count > 0)
+                    {
+                        string closingAlignTag = blockAlignStack.Pop();
+                        if (!string.IsNullOrEmpty(closingAlignTag))
+                            sb.Append($"[/{closingAlignTag}]");
+                    }
                     sb.Append('\n');
+                }
             }
             else
             {
@@ -1880,43 +1916,51 @@ public partial class ConsoleNode : Control, IGameConsole
     private static bool TryGetFontColorBbcode(string fullTag, out string colorTag)
     {
         colorTag = null;
-        Match match = _imgTagRegex.Match(fullTag.Replace("<font", "<img", StringComparison.OrdinalIgnoreCase));
-        string attrText;
-        if (match.Success)
-        {
-            attrText = match.Groups[1].Value;
-        }
-        else
-        {
-            int start = fullTag.IndexOf(' ');
-            int end = fullTag.LastIndexOf('>');
-            if (start < 0 || end <= start)
-                return false;
-            attrText = fullTag[start..end];
-        }
-
-        foreach (Match attr in _attrRegex.Matches(attrText))
-        {
-            string key = attr.Groups[1].Value;
-            if (!key.Equals("color", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            string colorRaw = GetAttrValue(attr)?.Trim();
-            if (string.IsNullOrEmpty(colorRaw))
-                return false;
-
-            if (!colorRaw.StartsWith("#", StringComparison.Ordinal))
-                colorRaw = "#" + colorRaw;
-
-            if (Regex.IsMatch(colorRaw, "^#[0-9a-fA-F]{6}$") || Regex.IsMatch(colorRaw, "^#[0-9a-fA-F]{8}$"))
-            {
-                colorTag = $"[color={colorRaw}]";
-                return true;
-            }
+        var attrs = ParseTagAttributes(fullTag);
+        if (!attrs.TryGetValue("color", out string colorRaw))
             return false;
-        }
 
+        colorRaw = DecodeHtmlEntities(colorRaw).Trim();
+        if (string.IsNullOrEmpty(colorRaw))
+            return false;
+
+        if (!colorRaw.StartsWith("#", StringComparison.Ordinal))
+            colorRaw = "#" + colorRaw;
+
+        if (Regex.IsMatch(colorRaw, "^#[0-9a-fA-F]{6}$") || Regex.IsMatch(colorRaw, "^#[0-9a-fA-F]{8}$"))
+        {
+            colorTag = $"[color={colorRaw}]";
+            return true;
+        }
         return false;
+    }
+
+    private static bool TryGetButtonValue(string fullTag, out string value)
+    {
+        value = string.Empty;
+        var attrs = ParseTagAttributes(fullTag);
+        if (!attrs.TryGetValue("value", out string raw) || string.IsNullOrWhiteSpace(raw))
+            return false;
+
+        value = DecodeHtmlEntities(raw).Trim();
+        return value.Length > 0;
+    }
+
+    private static bool TryGetParagraphAlignTag(string fullTag, out string alignTag)
+    {
+        alignTag = string.Empty;
+        var attrs = ParseTagAttributes(fullTag);
+        if (!attrs.TryGetValue("align", out string alignRaw) || string.IsNullOrWhiteSpace(alignRaw))
+            return false;
+
+        string v = DecodeHtmlEntities(alignRaw).Trim().ToLowerInvariant();
+        alignTag = v switch
+        {
+            "center" => "center",
+            "right" => "right",
+            _ => string.Empty,
+        };
+        return alignTag.Length > 0;
     }
 
     private static bool TryGetAnchorUrl(string fullTag, out string href)
@@ -2031,6 +2075,69 @@ public partial class ConsoleNode : Control, IGameConsole
         public int Height { get; }
     }
 
+    private enum HtmlRenderOpType
+    {
+        Text,
+        InlineImage,
+    }
+
+    private readonly struct HtmlRenderOp
+    {
+        private HtmlRenderOp(HtmlRenderOpType type, string text, string source, int width, int height)
+        {
+            Type = type;
+            Text = text;
+            Source = source;
+            Width = width;
+            Height = height;
+        }
+
+        public HtmlRenderOpType Type { get; }
+        public string Text { get; }
+        public string Source { get; }
+        public int Width { get; }
+        public int Height { get; }
+
+        public static HtmlRenderOp TextOp(string text) =>
+            new(HtmlRenderOpType.Text, text ?? string.Empty, string.Empty, 0, 0);
+
+        public static HtmlRenderOp InlineImageOp(string source, int width, int height) =>
+            new(HtmlRenderOpType.InlineImage, string.Empty, source ?? string.Empty, width, height);
+    }
+
+    private static List<HtmlRenderOp> ParseInlineHtmlRenderOps(string html)
+    {
+        var ops = new List<HtmlRenderOp>();
+        string body = html ?? string.Empty;
+        int cursor = 0;
+
+        foreach (Match img in _imgTagRegex.Matches(body))
+        {
+            if (img.Index > cursor)
+            {
+                string segment = body[cursor..img.Index];
+                string converted = HtmlToBbcode(segment);
+                if (!string.IsNullOrEmpty(converted))
+                    ops.Add(HtmlRenderOp.TextOp(converted));
+            }
+
+            if (TryParseInlineImgTag(img.Value, out string src, out int width, out int height))
+                ops.Add(HtmlRenderOp.InlineImageOp(src, width, height));
+
+            cursor = img.Index + img.Length;
+        }
+
+        if (cursor < body.Length)
+        {
+            string tail = body[cursor..];
+            string converted = HtmlToBbcode(tail);
+            if (!string.IsNullOrEmpty(converted))
+                ops.Add(HtmlRenderOp.TextOp(converted));
+        }
+
+        return ops;
+    }
+
     private static List<DivImageInstruction> ExtractDivImageInstructions(string html, out string remainingHtml)
     {
         var instructions = new List<DivImageInstruction>();
@@ -2094,6 +2201,22 @@ public partial class ConsoleNode : Control, IGameConsole
                 attrs[key] = value;
         }
         return attrs;
+    }
+
+    private static Dictionary<string, string> ParseTagAttributes(string fullTag)
+    {
+        if (string.IsNullOrWhiteSpace(fullTag))
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        int start = fullTag.IndexOf(' ');
+        int end = fullTag.LastIndexOf('>');
+        if (start < 0 || end <= start)
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        string attrText = fullTag[start..end].Trim();
+        if (attrText.EndsWith("/", StringComparison.Ordinal))
+            attrText = attrText[..^1].TrimEnd();
+        return ParseAttributes(attrText);
     }
 
     private static bool TryParseRect(string rectRaw, out int x, out int y, out int width, out int height)
