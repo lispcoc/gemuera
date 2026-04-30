@@ -664,12 +664,12 @@ public partial class ConsoleNode : Control, IGameConsole
         foreach (var inst in divImages)
         {
             string path = ResolveImagePathForBbcode(inst.Source);
-            CbgSet(path, inst.X, inst.Y, inst.Width, inst.Height);
+            CbgSet(path, inst.X, inst.Y, inst.Width, inst.Height, inst.IsRelative);
         }
         foreach (var inst in divTexts)
         {
             PrintHtmlDiv(inst.InnerHtml, inst.X, inst.Y, inst.Width, inst.Height,
-                         inst.Depth, inst.BColor, inst.BorderPx, inst.PaddingPx);
+                         inst.Depth, inst.BColor, inst.BorderPx, inst.PaddingPx, inst.IsRelative);
         }
 
         // Inline <img> in HTML_PRINT is rendered directly via AddImage instead of BBCode [img].
@@ -731,18 +731,24 @@ public partial class ConsoleNode : Control, IGameConsole
     }
 
     public void PrintHtmlDiv(string innerHtml, int x, int y, int width, int height,
-                              int depth, string bcolor, int borderPx, int paddingPx)
+                              int depth, string bcolor, int borderPx, int paddingPx, bool isRelative = true)
     {
         // Capture for closure.
         string capturedHtml = innerHtml;
         int cx = x, cy = y, cw = width, ch = height, cdepth = depth, cborder = borderPx, cpad = paddingPx;
         string cbcolor = bcolor;
+        bool relPos = isRelative;
 
         Enqueue(() =>
         {
+            // For display=relative, offset Y by current line position (bottom of visible scroll area).
+            int resolvedY = cy;
+            if (relPos)
+                resolvedY += ComputeCurrentLineY();
+
             // Outer container positioned within CbgContainer.
             var panel = new Panel();
-            panel.Position = new Vector2(cx, cy);
+            panel.Position = new Vector2(cx, resolvedY);
             if (cw > 0 && ch > 0)
                 panel.Size = new Vector2(cw, ch);
             panel.ClipContents = true;
@@ -827,6 +833,19 @@ public partial class ConsoleNode : Control, IGameConsole
         }
     }
 
+    // Returns approximated screen-Y of the current (bottom-most) visible line.
+    // For display=relative divs, this value is added to the div's parsed Y coordinate
+    // to match Emuera behaviour where isRelative places divs relative to the current line.
+    private int ComputeCurrentLineY()
+    {
+        if (_scroll == null) return 0;
+        // Auto-scroll keeps the latest content at the bottom of the viewport.
+        // Approximate the current-line Y as: scroll area height - one line height.
+        int scrollH = (int)_scroll.Size.Y;
+        int lineH   = _fontSize + 4;
+        return System.Math.Max(0, scrollH - lineH);
+    }
+
     private static Color ParseHtmlColor(string colorStr)
     {
         if (string.IsNullOrWhiteSpace(colorStr))
@@ -900,8 +919,9 @@ public partial class ConsoleNode : Control, IGameConsole
 
     // ---- CBG ----
 
-    public void CbgSet(string resourcePath, int x, int y, int width, int height)
+    public void CbgSet(string resourcePath, int x, int y, int width, int height, bool isRelative = false)
     {
+        bool relPos = isRelative;
         Enqueue(() =>
         {
             if (string.IsNullOrEmpty(resourcePath)) return;
@@ -912,10 +932,12 @@ public partial class ConsoleNode : Control, IGameConsole
                 GD.PrintErr($"[CBG] Image not found: {resourcePath} -> {resolved}");
                 return;
             }
+            // For display=relative, offset Y by current line position (bottom of visible scroll area).
+            int resolvedY = relPos ? y + ComputeCurrentLineY() : y;
             var rect = new TextureRect();
             rect.Texture = texture;
             rect.StretchMode = TextureRect.StretchModeEnum.Scale;
-            rect.Position = new Vector2(x, y);
+            rect.Position = new Vector2(x, resolvedY);
             if (width > 0 && height > 0)
                 rect.Size = new Vector2(width, height);
             else
@@ -2378,13 +2400,14 @@ public partial class ConsoleNode : Control, IGameConsole
 
     private readonly struct DivImageInstruction
     {
-        public DivImageInstruction(string source, int x, int y, int width, int height)
+        public DivImageInstruction(string source, int x, int y, int width, int height, bool isRelative = true)
         {
             Source = source;
             X = x;
             Y = y;
             Width = width;
             Height = height;
+            IsRelative = isRelative;
         }
 
         public string Source { get; }
@@ -2392,16 +2415,18 @@ public partial class ConsoleNode : Control, IGameConsole
         public int Y { get; }
         public int Width { get; }
         public int Height { get; }
+        public bool IsRelative { get; }
     }
 
     private sealed class DivHtmlInstruction
     {
         public DivHtmlInstruction(string innerHtml, int x, int y, int width, int height,
-                                   int depth, string bcolor, int borderPx, int paddingPx)
+                                   int depth, string bcolor, int borderPx, int paddingPx, bool isRelative = true)
         {
             InnerHtml = innerHtml;
             X = x; Y = y; Width = width; Height = height;
             Depth = depth; BColor = bcolor; BorderPx = borderPx; PaddingPx = paddingPx;
+            IsRelative = isRelative;
         }
         public string InnerHtml { get; }
         public int X { get; }
@@ -2412,6 +2437,7 @@ public partial class ConsoleNode : Control, IGameConsole
         public string BColor { get; }
         public int BorderPx { get; }
         public int PaddingPx { get; }
+        public bool IsRelative { get; }
     }
 
     private enum HtmlRenderOpType
@@ -2510,6 +2536,13 @@ public partial class ConsoleNode : Control, IGameConsole
             if (divAttrs.TryGetValue("padding", out string padRaw))
                 ParseImageDimension(padRaw, out paddingPx);
 
+            // display=absolute → isRelative=false (position from bottom-left of window).
+            // display=relative (default) → isRelative=true (position relative to current line).
+            bool isRelative = true;
+            if (divAttrs.TryGetValue("display", out string displayRaw) &&
+                displayRaw.Equals("absolute", StringComparison.OrdinalIgnoreCase))
+                isRelative = false;
+
             string innerContent = match.Groups[2].Value.Trim();
 
             // Check if this is purely an <img> element (CBG image overlay).
@@ -2527,13 +2560,13 @@ public partial class ConsoleNode : Control, IGameConsole
                     if (imgAttrs.TryGetValue("xpos",   out string xr)) { ParseImageDimension(xr, out int imgX); x += imgX; }
                     if (imgAttrs.TryGetValue("ypos",   out string yr)) { ParseImageDimension(yr, out int imgY); y += imgY; }
 
-                    images.Add(new DivImageInstruction(src, x, y, w, h));
+                    images.Add(new DivImageInstruction(src, x, y, w, h, isRelative));
                     return string.Empty;
                 }
             }
 
             // Non-image (or empty) div — render as positioned HTML overlay.
-            htmlDivs.Add(new DivHtmlInstruction(innerContent, x, y, w, h, depth, bcolor, borderPx, paddingPx));
+            htmlDivs.Add(new DivHtmlInstruction(innerContent, x, y, w, h, depth, bcolor, borderPx, paddingPx, isRelative));
             return string.Empty;
         });
     }

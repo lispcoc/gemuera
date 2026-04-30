@@ -41,7 +41,7 @@ public interface IGameConsole
     /// <summary>Render an absolutely positioned HTML div overlay.
     /// Created from <div rect='x,y,w,h'> elements extracted from HTML_PRINT content.
     /// innerHtml is the raw HTML content inside the div.</summary>
-    void PrintHtmlDiv(string innerHtml, int x, int y, int width, int height, int depth, string bcolor, int borderPx, int paddingPx);
+    void PrintHtmlDiv(string innerHtml, int x, int y, int width, int height, int depth, string bcolor, int borderPx, int paddingPx, bool isRelative = true);
 
     /// <summary>PRINT_IMG / GCREATE — display an image inline.</summary>
     void PrintImage(string resourcePath, int width, int height, int align);
@@ -66,7 +66,7 @@ public interface IGameConsole
     // ----------------------------------------------------------------
 
     /// <summary>CBGSETG — set a client background image.</summary>
-    void CbgSet(string resourcePath, int x, int y, int width, int height);
+    void CbgSet(string resourcePath, int x, int y, int width, int height, bool isRelative = false);
 
     /// <summary>CBGCLEAR — remove all client background images.</summary>
     void CbgClear();
